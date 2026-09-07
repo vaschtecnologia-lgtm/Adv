@@ -672,13 +672,65 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                     className="w-full px-2 py-2 bg-white border border-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded text-sm text-slate-900 font-semibold cursor-pointer"
                   >
                     <option value="TODOS">🌐 Todos os Tribunais (Abrangência Nacional)</option>
-                    <option value="TJDFT">TJDFT - Distrito Federal e Territórios</option>
-                    <option value="TRF1">TRF1 - Tribunal Regional Federal 1ª Região</option>
-                    <option value="TRT10">TRT10 - Tribunal Regional do Trabalho 10ª Região</option>
-                    <option value="STJ">STJ - Superior Tribunal de Justiça</option>
-                    <option value="STF">STF - Supremo Tribunal Federal</option>
-                    <option value="TST">TST - Tribunal Superior do Trabalho</option>
-                    <option value="TJSP">TJSP - Tribunal de Justiça de São Paulo</option>
+                    
+                    <optgroup label="⭐ DESTAQUE: ESTADO DE GOIÁS (GO)">
+                      <option value="TJGO">TJGO - Tribunal de Justiça de Goiás</option>
+                      <option value="TRT18">TRT18 - Tribunal Regional do Trabalho 18ª Região (GO)</option>
+                      <option value="TRF1">TRF1 - Tribunal Regional Federal 1ª Região (Abrange GO)</option>
+                    </optgroup>
+
+                    <optgroup label="⭐ DESTAQUE: DISTRITO FEDERAL (DF)">
+                      <option value="TJDFT">TJDFT - Distrito Federal e Territórios</option>
+                      <option value="TRF1">TRF1 - Tribunal Regional Federal 1ª Região (Sede DF)</option>
+                      <option value="TRT10">TRT10 - Tribunal Regional do Trabalho 10ª Região (DF/TO)</option>
+                    </optgroup>
+
+                    <optgroup label="🏛️ Tribunais Superiores e Conselhos (Nacional)">
+                      <option value="STJ">STJ - Superior Tribunal de Justiça</option>
+                      <option value="STF">STF - Supremo Tribunal Federal</option>
+                      <option value="TST">TST - Tribunal Superior do Trabalho</option>
+                      <option value="TSE">TSE - Tribunal Superior Eleitoral</option>
+                      <option value="STM">STM - Superior Tribunal Militar</option>
+                      <option value="CNJ">CNJ - Conselho Nacional de Justiça</option>
+                    </optgroup>
+
+                    <optgroup label="⚖️ Tribunais de Justiça Estaduais (TJs)">
+                      <option value="TJSP">TJSP - Tribunal de Justiça de São Paulo</option>
+                      <option value="TJRJ">TJRJ - Tribunal de Justiça do Rio de Janeiro</option>
+                      <option value="TJMG">TJMG - Tribunal de Justiça de Minas Gerais</option>
+                      <option value="TJBA">TJBA - Tribunal de Justiça da Bahia</option>
+                      <option value="TJRS">TJRS - Tribunal de Justiça do Rio Grande do Sul</option>
+                      <option value="TJPR">TJPR - Tribunal de Justiça do Paraná</option>
+                      <option value="TJSC">TJSC - Tribunal de Justiça de Santa Catarina</option>
+                      <option value="TJPE">TJPE - Tribunal de Justiça de Pernambuco</option>
+                      <option value="TJCE">TJCE - Tribunal de Justiça do Ceará</option>
+                    </optgroup>
+
+                    <optgroup label="🏢 Tribunais Regionais Federais (TRFs)">
+                      <option value="TRF1">TRF1 - Regional Federal 1ª Região</option>
+                      <option value="TRF2">TRF2 - Regional Federal 2ª Região (RJ/ES)</option>
+                      <option value="TRF3">TRF3 - Regional Federal 3ª Região (SP/MS)</option>
+                      <option value="TRF4">TRF4 - Regional Federal 4ª Região (Sul)</option>
+                      <option value="TRF5">TRF5 - Regional Federal 5ª Região (Nordeste)</option>
+                      <option value="TRF6">TRF6 - Regional Federal 6ª Região (MG)</option>
+                    </optgroup>
+
+                    <optgroup label="🔨 Tribunais Regionais do Trabalho (TRTs)">
+                      <option value="TRT10">TRT10 - Regional do Trabalho 10ª Região (DF/TO)</option>
+                      <option value="TRT18">TRT18 - Regional do Trabalho 18ª Região (GO)</option>
+                      <option value="TRT1">TRT1 - Regional do Trabalho 1ª Região (RJ)</option>
+                      <option value="TRT2">TRT2 - Regional do Trabalho 2ª Região (SP Capital)</option>
+                      <option value="TRT3">TRT3 - Regional do Trabalho 3ª Região (MG)</option>
+                      <option value="TRT4">TRT4 - Regional do Trabalho 4ª Região (RS)</option>
+                      <option value="TRT15">TRT15 - Regional do Trabalho 15ª Região (SP Interior)</option>
+                    </optgroup>
+
+                    <optgroup label="📁 Estrutura de 1ª Instância (Varas)">
+                      <option value="1ª INSTÂNCIA - TJDFT">1ª Instância - TJDFT (Varas do Distrito Federal)</option>
+                      <option value="1ª INSTÂNCIA - TRF1">1ª Instância - TRF1 (Varas Federais da 1ª Região)</option>
+                      <option value="1ª INSTÂNCIA - TRT10">1ª Instância - TRT10 (Varas do Trabalho da 10ª Região)</option>
+                      <option value="1ª INSTÂNCIA - ESTADUAL GERAL">1ª Instância - Estadual Geral (Varas Estaduais do Brasil)</option>
+                    </optgroup>
                   </select>
                 </div>
 
@@ -727,8 +779,25 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                   type="button"
                   onClick={() => handleLoadPreset('0708912-44.2024.8.07.0001')}
                   className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-[#003366] font-bold rounded cursor-pointer"
+                  title="Simular busca no TJDFT (Distrito Federal)"
                 >
                   TJDFT: 0708912-44.2024
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoadPreset('0806456-12.2024.8.09.0051')}
+                  className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold rounded cursor-pointer"
+                  title="Simular busca no TJGO (Goiás)"
+                >
+                  TJGO: 0806456-12.2024
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoadPreset('0010412-15.2024.5.18.0007')}
+                  className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold rounded cursor-pointer"
+                  title="Simular busca no TRT18 (Goiás Trabalhista)"
+                >
+                  TRT18: 0010412-15.2024
                 </button>
                 <button
                   type="button"
@@ -749,11 +818,11 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                   onClick={() => {
                     setSearchMode('pje_official');
                     setPartyQuery('Carlos Eduardo Silveira');
-                    setSelectedTribunal('TJDFT');
+                    setSelectedTribunal('TJGO');
                   }}
                   className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-[#003366] font-bold rounded cursor-pointer"
                 >
-                  Parte: Carlos Eduardo Silveira
+                  Parte em Goiás (GO)
                 </button>
               </div>
 

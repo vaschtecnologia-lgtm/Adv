@@ -1,0 +1,32 @@
+{
+  "id": "/",
+  "name": "WONO ADVOCACIA",
+  "short_name": "WonoJuris",
+  "description": "Sistema de gestão jurídica e processual do escritório WONO ADVOCACIA com consulta de andamentos online na base DataJud/CNJ, gerador e impressão de procurações e contratos de honorários, agenda de prazos CPC e gestão de clientes.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#020617",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192x192.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512x512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512x512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "maskable"
+    }
+  ]
+}

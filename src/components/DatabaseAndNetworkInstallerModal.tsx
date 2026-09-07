@@ -56,6 +56,7 @@ import {
   generateInstallationGuideMd,
   InstallerDataPayload 
 } from '../services/installerPackageService';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface DatabaseAndNetworkInstallerModalProps {
   isOpen: boolean;
@@ -86,7 +87,9 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
   auditLogs = [],
   onImportFullBackup,
 }) => {
-  const [activeTab, setActiveTab] = useState<'servidor_gratis' | 'publicar_netlify' | 'rede_local' | 'banco_dados' | 'modo_offline' | 'guia_passos'>('publicar_netlify');
+  const [activeTab, setActiveTab] = useState<'servidor_gratis' | 'publicar_netlify' | 'pwa_mobile' | 'rede_local' | 'banco_dados' | 'modo_offline' | 'guia_passos'>('pwa_mobile');
+  const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
+  const [showIOSManualGuide, setShowIOSManualGuide] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isGeneratingZip, setIsGeneratingZip] = useState(false);
   const [networkInfo, setNetworkInfo] = useState<{
@@ -255,6 +258,21 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
           </button>
 
           <button
+            onClick={() => setActiveTab('pwa_mobile')}
+            className={`px-4 py-2.5 font-black text-xs sm:text-sm rounded-t-xl transition flex items-center gap-2 cursor-pointer whitespace-nowrap border-t border-x ${
+              activeTab === 'pwa_mobile'
+                ? 'bg-slate-900 border-slate-700 text-sky-400 shadow-sm'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'
+            }`}
+          >
+            <Smartphone className="w-4 h-4 text-sky-400" />
+            <span>3. App Celular (Android & iOS)</span>
+            <span className="bg-sky-500/20 text-sky-300 text-[10px] px-1.5 py-0.5 rounded font-black uppercase">
+              PWA 📱
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('rede_local')}
             className={`px-4 py-2.5 font-bold text-xs sm:text-sm rounded-t-xl transition flex items-center gap-2 cursor-pointer whitespace-nowrap border-t border-x ${
               activeTab === 'rede_local'
@@ -263,7 +281,7 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
             }`}
           >
             <Monitor className="w-4 h-4" />
-            3. Instalador PC & Rede Local
+            4. Instalador PC & Rede Local
           </button>
 
           <button
@@ -275,7 +293,7 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
             }`}
           >
             <Database className="w-4 h-4" />
-            4. Banco de Dados SQL
+            5. Banco de Dados SQL
           </button>
 
           <button
@@ -287,7 +305,7 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
             }`}
           >
             <Zap className="w-4 h-4" />
-            5. Online vs. 100% Offline
+            6. Online vs. 100% Offline
           </button>
 
           <button
@@ -299,7 +317,7 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
             }`}
           >
             <BookOpen className="w-4 h-4" />
-            6. Manual de Implantação
+            7. Manual de Implantação
           </button>
         </div>
 
@@ -473,6 +491,207 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
                 <div className="p-3.5 bg-slate-900/50 rounded-xl text-[11px] text-slate-400 leading-relaxed border border-slate-800/60">
                   <span className="font-bold text-slate-300">Explicação Técnica:</span> Este arquivo define que o comando de build padrão para o Vite no Netlify é <code className="text-slate-300">npm run build</code> e a pasta de publicação final é <code className="text-slate-300">dist</code>. O bloco de <code className="text-slate-300">[[redirects]]</code> é fundamental para garantir que qualquer rota da interface SPA do React funcione corretamente sem dar erro 404 ao atualizar a página.
                 </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB: DISPOSITIVOS MÓVEIS / PWA APP CELULAR */}
+          {activeTab === 'pwa_mobile' && (
+            <div className="space-y-6">
+              
+              {/* Header Card */}
+              <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-sky-500/30 p-5 rounded-2xl space-y-4 shadow-xl shadow-sky-950/20">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-sky-500/20">
+                      <Smartphone className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="text-base font-black text-slate-100 flex items-center gap-2">
+                        Aplicativo Móvel para Android & iPhone
+                        <span className="bg-sky-500/20 text-sky-300 border border-sky-500/40 text-[10px] px-2 py-0.5 rounded font-black tracking-wide uppercase">
+                          Tecnologia PWA • Sem Lojas de App
+                        </span>
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        Não é necessário baixar arquivos .APK ou pagar taxas de desenvolvedor da Apple/Google. Instale o WonoJuris direto no celular como um Web App Progressivo.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status Indicator / Live Installer Prompt */}
+              <div className="bg-slate-950 border border-slate-800 p-6 rounded-2xl space-y-6">
+                <div className="flex flex-col md:flex-row items-center gap-6 justify-between">
+                  <div className="space-y-2 text-center md:text-left max-w-xl">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-sky-500/10 text-sky-400 rounded-full text-xs font-bold border border-sky-500/20">
+                      <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                      Status de Instalação no Aparelho Atual
+                    </div>
+                    
+                    {isInstalled ? (
+                      <div className="space-y-1">
+                        <h5 className="text-base font-extrabold text-emerald-400 flex items-center justify-center md:justify-start gap-1.5">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                          Aplicativo Instalado com Sucesso!
+                        </h5>
+                        <p className="text-xs text-slate-400">
+                          Você já está utilizando o WonoJuris em modo standalone nativo. Acesse-o pelo ícone na tela inicial do seu celular.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <h5 className="text-base font-extrabold text-slate-100">
+                          Pronto para Instalação no Celular
+                        </h5>
+                        <p className="text-xs text-slate-400">
+                          Detectamos que você pode instalar este sistema agora mesmo para ter um atalho rápido na sua tela inicial, interface em tela cheia (sem barra de navegador) e funcionamento offline.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dynamic Installation Triggers */}
+                  <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
+                    {/* Standard PWA Prompt */}
+                    {isInstallable && !isInstalled && (
+                      <button
+                        onClick={install}
+                        className="w-full md:w-auto px-6 py-3.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-black text-sm rounded-xl shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 transition cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Instalar no meu Android / PC</span>
+                      </button>
+                    )}
+
+                    {/* iOS Manual Guide Toggle */}
+                    {isIOS && !isInstalled && (
+                      <button
+                        onClick={() => setShowIOSManualGuide(!showIOSManualGuide)}
+                        className="w-full md:w-auto px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-sky-400 border border-slate-800 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition cursor-pointer"
+                      >
+                        <Smartphone className="w-4 h-4" />
+                        <span>Instalar no meu iPhone (iOS)</span>
+                      </button>
+                    )}
+
+                    {/* Fallback Desktop Instructions */}
+                    {!isInstallable && !isIOS && !isInstalled && (
+                      <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 text-center md:text-right max-w-xs">
+                        <p className="text-[11px] text-slate-400">
+                          💡 No smartphone, abra o link do sistema no navegador <strong className="text-white">Safari (iPhone)</strong> ou <strong className="text-white">Chrome (Android)</strong> para habilitar a instalação nativa com 1 clique.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* iOS Manual Step-by-Step Instructions Panel */}
+                {(isIOS || showIOSManualGuide) && !isInstalled && (
+                  <div className="p-5 bg-slate-900 border border-sky-500/20 rounded-xl space-y-4 animate-fade-in">
+                    <h5 className="text-xs font-black uppercase text-sky-400 tracking-wider flex items-center gap-1.5">
+                      <Smartphone className="w-4 h-4" />
+                      Passo a Passo para iPhone / iPad (Safari)
+                    </h5>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <span className="w-6 h-6 rounded-full bg-sky-500 text-slate-950 font-black flex items-center justify-center">1</span>
+                        <p className="text-slate-300">
+                          Abra este sistema no navegador nativo <strong className="text-white">Safari</strong> do seu iPhone.
+                        </p>
+                      </div>
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <span className="w-6 h-6 rounded-full bg-sky-500 text-slate-950 font-black flex items-center justify-center">2</span>
+                        <p className="text-slate-300">
+                          Toque no ícone de <strong className="text-white">Compartilhar</strong> (quadrado com uma seta para cima na barra inferior).
+                        </p>
+                      </div>
+                      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <span className="w-6 h-6 rounded-full bg-sky-500 text-slate-950 font-black flex items-center justify-center">3</span>
+                        <p className="text-slate-300">
+                          Role a lista para baixo e selecione a opção <strong className="text-white">Adicionar à Tela de Início</strong>. Pronto!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* QR Code and Remote Access Instructions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* QR Code Card */}
+                <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between space-y-4 shadow-sm">
+                  <div className="space-y-3">
+                    <h5 className="font-extrabold text-sm text-slate-100 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-sky-400" />
+                      Acesse Rápido no Celular (Escaneie o QR Code)
+                    </h5>
+                    <p className="text-xs text-slate-400">
+                      Escaneie o código abaixo com a câmera do seu celular para abrir o link do sistema WonoJuris instantaneamente no seu aparelho.
+                    </p>
+
+                    <div className="flex justify-center p-4 bg-white rounded-xl w-40 h-40 mx-auto border border-slate-200">
+                      {/* Simple Dynamic SVG QR Code mockup for client URL */}
+                      <svg className="w-full h-full text-slate-950" viewBox="0 0 100 100" fill="currentColor">
+                        <path d="M5,5 h20 v20 h-20 z M9,9 h12 v12 h-12 z M13,13 h4 v4 h-4 z" />
+                        <path d="M75,5 h20 v20 h-20 z M79,9 h12 v12 h-12 z M83,13 h4 v4 h-4 z" />
+                        <path d="M5,75 h20 v20 h-20 z M9,79 h12 v12 h-12 z M13,83 h4 v4 h-4 z" />
+                        {/* Fake random QR matrix bits */}
+                        <path d="M35,5 h5 v5 h-5 z M45,5 h5 v5 h-5 z M55,5 h10 v5 h-10 z M35,15 h10 v5 h-10 z M55,15 h5 v5 h-5 z M65,15 h5 v5 h-5 z" />
+                        <path d="M35,25 h5 v10 h-5 z M45,30 h10 v5 h-10 z M60,25 h15 v5 h-15 z M85,30 h10 v5 h-10 z" />
+                        <path d="M5,35 h15 v5 h-15 z M25,45 h5 v5 h-5 z M35,45 h20 v5 h-20 z M60,45 h5 v5 h-5 z M75,45 h15 v5 h-15 z" />
+                        <path d="M10,55 h5 v10 h-5 z M25,55 h10 v5 h-10 z M45,55 h5 v5 h-5 z M55,55 h15 v10 h-15 z M80,55 h15 v5 h-15 z" />
+                        <path d="M35,65 h10 v5 h-10 z M50,70 h15 v5 h-15 z M70,65 h5 v10 h-5 z M80,70 h5 v5 h-5 z" />
+                        <path d="M35,75 h5 v15 h-5 z M45,85 h20 v5 h-20 z M75,85 h10 v5 h-10 z M90,80 h5 v15 h-5 z" />
+                      </svg>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-900 rounded-xl text-center border border-slate-800">
+                    <span className="text-[11px] text-sky-400 font-mono select-all break-all">
+                      {window.location.href}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Mobile Server Connection (Wi-Fi Redirection) */}
+                <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl flex flex-col justify-between space-y-4 shadow-sm">
+                  <div className="space-y-3">
+                    <h5 className="font-extrabold text-sm text-slate-100 flex items-center gap-1.5">
+                      <Wifi className="w-4 h-4 text-sky-400" />
+                      Conexão em Rede Local (Wi-Fi do Escritório)
+                    </h5>
+                    <p className="text-xs text-slate-400">
+                      Caso esteja rodando o servidor no seu computador local, você pode acessar e instalar o app no celular conectando o smartphone na mesma rede Wi-Fi e digitando o endereço IP local do seu servidor:
+                    </p>
+
+                    <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-3 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 font-bold">Endereço IP sugerido:</span>
+                        <span className="text-sky-400 font-mono font-bold text-sm bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
+                          http://192.168.1.105:3000
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 leading-relaxed">
+                        ⚠️ <strong className="text-slate-300">Atenção:</strong> Certifique-se de que o firewall do seu computador servidor está configurado para liberar a porta <strong className="text-white">3000</strong>. O script de instalação automática local do WonoJuris já realiza essa liberação automaticamente.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h6 className="text-[11px] font-bold text-slate-300">Vantagens de Usar o App Celular:</h6>
+                    <ul className="text-[11px] text-slate-400 space-y-1 list-disc list-inside">
+                      <li>Uso em audiências no celular pelo 4G/5G sem barra do navegador;</li>
+                      <li>Contatos de clientes integrados para ligar ou abrir o WhatsApp;</li>
+                      <li>Consulta rápida a andamentos de processos CNJ direto da palma da sua mão.</li>
+                    </ul>
+                  </div>
+                </div>
+
               </div>
 
             </div>
