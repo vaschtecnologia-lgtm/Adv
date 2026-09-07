@@ -1,0 +1,6 @@
+{
+  "name": "WONO ADVOCACIA",
+  "description": "Sistema de gestão jurídica e processual do escritório WONO ADVOCACIA com consulta de andamentos online na base DataJud/CNJ, gerador e impressão de procurações e contratos de honorários, agenda de prazos CPC e gestão de clientes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
