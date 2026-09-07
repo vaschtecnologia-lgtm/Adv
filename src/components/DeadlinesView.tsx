@@ -52,6 +52,59 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeadlineId, setEditingDeadlineId] = useState<string | null>(null);
 
+  // CPC Working Days Calculator States
+  const [showCpcCalculator, setShowCpcCalculator] = useState(false);
+  const [cpcStartDate, setCpcStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [cpcDays, setCpcDays] = useState<number>(15);
+  const [cpcType, setCpcType] = useState<'úteis' | 'corridos'>('úteis');
+  const [cpcCalculationResult, setCpcCalculationResult] = useState<string | null>(null);
+
+  // Helper to calculate legal deadlines in working days or consecutive days (reproduced from Astrea system logic)
+  const calculateCpcDeadline = (start: string, daysCount: number, calcType: 'úteis' | 'corridos'): string => {
+    if (!start) return '';
+    const holidays = [
+      '01-01', // Confraternização Universal (Ano Novo)
+      '04-21', // Tiradentes
+      '05-01', // Dia do Trabalho
+      '09-07', // Independência do Brasil
+      '10-12', // Nossa Senhora Aparecida
+      '11-02', // Finados
+      '11-15', // Proclamação da República
+      '12-25', // Natal
+    ];
+    let currentDate = new Date(start + 'T12:00:00');
+    
+    if (calcType === 'corridos') {
+      currentDate.setDate(currentDate.getDate() + daysCount);
+      return currentDate.toISOString().split('T')[0];
+    }
+
+    let daysAdded = 0;
+    while (daysAdded < daysCount) {
+      currentDate.setDate(currentDate.getDate() + 1);
+      const dayOfWeek = currentDate.getDay(); // 0: Sunday, 6: Saturday
+      const monthDayStr = `${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const isHoliday = holidays.includes(monthDayStr);
+      
+      if (!isWeekend && !isHoliday) {
+        daysAdded++;
+      }
+    }
+    return currentDate.toISOString().split('T')[0];
+  };
+
+  const handleApplyCpcCalculation = () => {
+    const result = calculateCpcDeadline(cpcStartDate, cpcDays, cpcType);
+    if (result) {
+      setFatalDate(result);
+      const daysOfWeek = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+      const calculatedDateObj = new Date(result + 'T12:00:00');
+      const dayName = daysOfWeek[calculatedDateObj.getDay()];
+      setCpcCalculationResult(`Calculado: ${new Date(result + 'T12:00:00').toLocaleDateString('pt-BR')} (${dayName})`);
+    }
+  };
+
   // Delete deadline confirmation
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
@@ -664,6 +717,76 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 focus:border-amber-500 focus:outline-none"
                   />
                 </div>
+              </div>
+
+              {/* Astrea-style Legal Deadlines Calculator */}
+              <div className="border border-slate-800 bg-slate-950/50 rounded-xl p-3 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCpcCalculator(!showCpcCalculator)}
+                  className="w-full text-left font-bold text-amber-400 flex items-center justify-between text-xs hover:text-amber-300 cursor-pointer focus:outline-none"
+                >
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    Calculadora Novo CPC (Dias Úteis) Astrea Style
+                  </span>
+                  <span>{showCpcCalculator ? 'Recolher ▲' : 'Expandir ▼'}</span>
+                </button>
+                
+                {showCpcCalculator && (
+                  <div className="space-y-2.5 pt-2 border-t border-slate-800/60 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <p className="text-[10px] text-slate-400 leading-normal">
+                      Calcula a data fatal excluindo finais de semana e feriados nacionais brasileiros, conforme o Art. 219 do Novo CPC.
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-1">Data da Intimação</label>
+                        <input
+                          type="date"
+                          value={cpcStartDate}
+                          onChange={(e) => setCpcStartDate(e.target.value)}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 font-mono text-[11px] focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-1">Qtd. Dias</label>
+                        <input
+                          type="number"
+                          value={cpcDays}
+                          onChange={(e) => setCpcDays(Number(e.target.value))}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-[11px] focus:outline-none focus:border-amber-500"
+                          min={1}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 mb-1">Tipo de Dias</label>
+                        <select
+                          value={cpcType}
+                          onChange={(e) => setCpcType(e.target.value as any)}
+                          className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 text-[11px] focus:outline-none focus:border-amber-500"
+                        >
+                          <option value="úteis">Dias Úteis</option>
+                          <option value="corridos">Dias Corridos</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleApplyCpcCalculation}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-lg text-[11px] transition cursor-pointer"
+                      >
+                        Calcular & Aplicar
+                      </button>
+                      {cpcCalculationResult && (
+                        <span className="text-[11px] text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg">
+                          {cpcCalculationResult}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

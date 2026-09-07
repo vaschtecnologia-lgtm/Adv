@@ -1812,6 +1812,7 @@ app.post("/api/gemini/analyze-andamento", async (req, res) => {
       let recommended = "Analisar os autos digitais e arquivar andamento.";
       let summary = "Movimentação processual registrada nos autos.";
       let clientExp = "Ocorreu uma movimentação de rotina no andamento do seu processo.";
+      let tendency: "Positiva" | "Negativa" | "Neutra" = "Neutra";
 
       if (lowerText.includes("15 dias") || lowerText.includes("quinze dias")) {
         detectedDays = 15;
@@ -1825,6 +1826,32 @@ app.post("/api/gemini/analyze-andamento", async (req, res) => {
       } else if (lowerText.includes("8 dias") || lowerText.includes("oito dias")) {
         detectedDays = 8;
         urgency = "alta";
+      }
+
+      // Tendency heuristics
+      if (
+        lowerText.includes("deferido") || 
+        lowerText.includes("concedido") || 
+        lowerText.includes("procedente") || 
+        lowerText.includes("provido") || 
+        lowerText.includes("segurança concedida") || 
+        lowerText.includes("liminar deferida") || 
+        lowerText.includes("tutela de urgência para determinar") ||
+        lowerText.includes("provisória de urgência") ||
+        lowerText.includes("êxito")
+      ) {
+        tendency = "Positiva";
+      } else if (
+        lowerText.includes("indeferido") || 
+        lowerText.includes("negado") || 
+        lowerText.includes("improcedente") || 
+        lowerText.includes("rejeitado") || 
+        lowerText.includes("extinto sem resolução") ||
+        lowerText.includes("penhora") ||
+        lowerText.includes("multa") ||
+        lowerText.includes("inadimplemento")
+      ) {
+        tendency = "Negativa";
       }
 
       if (lowerText.includes("sentença") || lowerText.includes("julgo procedente") || lowerText.includes("julgo improcedente")) {
@@ -1870,6 +1897,7 @@ app.post("/api/gemini/analyze-andamento", async (req, res) => {
         deadlineDays: detectedDays,
         deadlineType: lowerText.includes("penal") ? "Corridos" : "Úteis",
         suggestedWhatsApp,
+        tendency,
       };
     };
 
@@ -1891,6 +1919,7 @@ Regras de análise:
 5. "deadlineDays": número de dias de prazo se houver (ex: 15, 5, 8, 10) ou 0 se não houver prazo.
 6. "deadlineType": "Úteis" (regra geral CPC) ou "Corridos" (Processo Penal/ECA).
 7. "suggestedWhatsApp": Mensagem pronta e profissional para enviar via WhatsApp para o cliente informando o andamento de maneira acolhedora e transparente.
+8. "tendency": "Positiva" | "Negativa" | "Neutra" (Identifique se o teor desta movimentação é favorável [Positiva], desfavorável [Negativa] ou neutro/procedimental [Neutra] para os interesses do cliente e do escritório).
 
 Retorne APENAS o JSON no formato:
 {
@@ -1900,7 +1929,8 @@ Retorne APENAS o JSON no formato:
   "urgency": "alta",
   "deadlineDays": 15,
   "deadlineType": "Úteis",
-  "suggestedWhatsApp": "..."
+  "suggestedWhatsApp": "...",
+  "tendency": "Positiva"
 }`;
 
     const result = await callGeminiJSON(prompt, fallbackGenerator, {
@@ -1918,6 +1948,7 @@ Retorne APENAS o JSON no formato:
       deadlineDays: 15,
       deadlineType: "Úteis",
       suggestedWhatsApp: `Olá! Passando para informar que tivemos uma nova movimentação no seu processo (${req.body.processNumber || ""}). Nossa equipe já está cuidando do expediente dentro do prazo legal.`,
+      tendency: "Neutra"
     });
   }
 });

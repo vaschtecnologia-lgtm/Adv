@@ -656,9 +656,10 @@ export default function App() {
     const proc = processes.find((p) => p.id === processId);
     if (!proc) return;
     
-    // Check if user is in view-only / "leitura" mode (sem privilégio)
-    if (activeUser?.privilege === 'leitura') {
-      setSyncToastMessage('⚠️ Acesso Negado: Usuários sem privilégio (leitura) não podem excluir processos.');
+    // Check if user is General Administrator (Sócio Administrador or total privilege)
+    const isGeneralAdmin = activeUser?.role === 'Sócio Administrador' || activeUser?.privilege === 'total';
+    if (!isGeneralAdmin) {
+      setSyncToastMessage('⚠️ Acesso Negado: Apenas o Administrador Geral (Sócio Administrador) pode deletar processos.');
       setTimeout(() => setSyncToastMessage(null), 4000);
       return;
     }
@@ -744,6 +745,14 @@ export default function App() {
   };
 
   const handleDeleteDeadline = (id: string) => {
+    // Check if user is General Administrator (Sócio Administrador or total privilege)
+    const isGeneralAdmin = activeUser?.role === 'Sócio Administrador' || activeUser?.privilege === 'total';
+    if (!isGeneralAdmin) {
+      setSyncToastMessage('⚠️ Acesso Negado: Apenas o Administrador Geral (Sócio Administrador) pode deletar prazos.');
+      setTimeout(() => setSyncToastMessage(null), 4000);
+      return;
+    }
+
     const dead = deadlines.find((d) => d.id === id);
     if (dead) {
       const trashEntry: TrashItem = {
@@ -792,9 +801,10 @@ export default function App() {
     const client = clients.find((c) => c.id === clientId);
     if (!client) return;
 
-    // Check if user is in view-only / "leitura" mode (sem privilégio)
-    if (activeUser?.privilege === 'leitura') {
-      setSyncToastMessage('⚠️ Acesso Negado: Usuários sem privilégio (leitura) não podem excluir clientes.');
+    // Check if user is General Administrator (Sócio Administrador or total privilege)
+    const isGeneralAdmin = activeUser?.role === 'Sócio Administrador' || activeUser?.privilege === 'total';
+    if (!isGeneralAdmin) {
+      setSyncToastMessage('⚠️ Acesso Negado: Apenas o Administrador Geral (Sócio Administrador) pode deletar clientes.');
       setTimeout(() => setSyncToastMessage(null), 4000);
       return;
     }
@@ -860,6 +870,14 @@ export default function App() {
   };
 
   const handleDeleteDocument = (id: string) => {
+    // Check if user is General Administrator (Sócio Administrador or total privilege)
+    const isGeneralAdmin = activeUser?.role === 'Sócio Administrador' || activeUser?.privilege === 'total';
+    if (!isGeneralAdmin) {
+      setSyncToastMessage('⚠️ Acesso Negado: Apenas o Administrador Geral (Sócio Administrador) pode deletar documentos.');
+      setTimeout(() => setSyncToastMessage(null), 4000);
+      return;
+    }
+
     const doc = documents.find((d) => d.id === id);
     if (doc) {
       const trashEntry: TrashItem = {
@@ -897,6 +915,14 @@ export default function App() {
   };
 
   const handleDeleteTeamMember = (id: string) => {
+    // Check if user is General Administrator (Sócio Administrador or total privilege)
+    const isGeneralAdmin = activeUser?.role === 'Sócio Administrador' || activeUser?.privilege === 'total';
+    if (!isGeneralAdmin) {
+      setSyncToastMessage('⚠️ Acesso Negado: Apenas o Administrador Geral (Sócio Administrador) pode remover membros da equipe.');
+      setTimeout(() => setSyncToastMessage(null), 4000);
+      return;
+    }
+
     const member = teamMembers.find((m) => m.id === id);
     setTeamMembers((prev) => prev.filter((m) => m.id !== id));
     logAction('DELETE', 'EQUIPE', `Membro ${member?.name || id} revogado da banca`);
@@ -919,6 +945,14 @@ export default function App() {
   };
 
   const handleDeleteFinancialRecord = (id: string) => {
+    // Check if user is General Administrator (Sócio Administrador or total privilege)
+    const isGeneralAdmin = activeUser?.role === 'Sócio Administrador' || activeUser?.privilege === 'total';
+    if (!isGeneralAdmin) {
+      setSyncToastMessage('⚠️ Acesso Negado: Apenas o Administrador Geral (Sócio Administrador) pode deletar registros financeiros.');
+      setTimeout(() => setSyncToastMessage(null), 4000);
+      return;
+    }
+
     const rec = financialRecords.find((r) => r.id === id);
     setFinancialRecords((prev) => prev.filter((r) => r.id !== id));
     logAction('DELETE', 'FINANCEIRO', `Lançamento "${rec?.title || id}" removido`);
@@ -1377,6 +1411,7 @@ export default function App() {
             deadlines={computedDeadlines}
             clients={clients}
             office={office}
+            financialRecords={financialRecords}
             onNavigateTab={setCurrentTab}
             onSelectProcess={(id) => {
               setSelectedProcessId(id);
@@ -1384,6 +1419,7 @@ export default function App() {
             }}
             onOpenNewDocumentModal={handleOpenNewDocumentModal}
             onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
+            activeUser={activeUser}
           />
         )}
 
@@ -1483,6 +1519,7 @@ export default function App() {
             onUpdateTenantConfig={handleUpdateSaasConfig}
             onImportFullBackup={handleImportFullBackup}
             onOpenDatabaseInstaller={() => setIsDatabaseInstallerOpen(true)}
+            activeUser={activeUser}
           />
         )}
 

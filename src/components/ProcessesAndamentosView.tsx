@@ -41,12 +41,47 @@ import {
   BookmarkCheck,
   RotateCw,
   Calculator,
-  Brain
+  Brain,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { LegalProcess, ProcessMovement, Client, ProcessDeadline, LawOfficeSettings, TeamMember, LegalDocumentItem } from '../types';
 import { formatCurrencyBRL, generateSubstabelecimentoText } from '../utils/documentGenerator';
 import { CourtCostsCalculator } from './CourtCostsCalculator';
 import { AdvancedOnlineSearch } from './AdvancedOnlineSearch';
+
+export const classifyMovementTendencyLocal = (title: string, description: string): 'Positiva' | 'Negativa' | 'Neutra' => {
+  const combined = `${title} ${description}`.toLowerCase();
+  if (
+    combined.includes("deferido") || 
+    combined.includes("concedido") || 
+    combined.includes("procedente") || 
+    combined.includes("provido") || 
+    combined.includes("segurança concedida") || 
+    combined.includes("liminar deferida") || 
+    combined.includes("tutela de urgência para determinar") ||
+    combined.includes("provisória de urgência") ||
+    combined.includes("êxito") ||
+    combined.includes("favorável")
+  ) {
+    return "Positiva";
+  }
+  if (
+    combined.includes("indeferido") || 
+    combined.includes("negado") || 
+    combined.includes("improcedente") || 
+    combined.includes("rejeitado") || 
+    combined.includes("extinto sem resolução") ||
+    combined.includes("penhora") ||
+    combined.includes("multa") ||
+    combined.includes("inadimplemento") ||
+    combined.includes("desfavorable") ||
+    combined.includes("desfavorável")
+  ) {
+    return "Negativa";
+  }
+  return "Neutra";
+};
 
 interface ProcessesAndamentosViewProps {
   processes: LegalProcess[];
@@ -651,10 +686,14 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
       judge: result.judge,
       lastSyncDate: new Date().toISOString(),
       notes: 'Processo importado da busca online do Tribunal/DataJud.',
-      movements: (result.movements || []).map((m: any, idx: number) => ({
-        ...m,
-        id: `mov-imp-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
-      })),
+      movements: (result.movements || []).map((m: any, idx: number) => {
+        const autoTendency = classifyMovementTendencyLocal(m.title, m.description);
+        return {
+          ...m,
+          id: `mov-imp-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+          tendency: m.tendency || autoTendency,
+        };
+      }),
     };
 
     onAddProcess(newProc);
@@ -688,8 +727,10 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
       // Update process movement with AI analysis
       const updatedMovements = targetProc.movements.map((m) => {
         if (m.id === movement.id) {
+          const mTendency = data.tendency || classifyMovementTendencyLocal(m.title, m.description);
           return {
             ...m,
+            tendency: mTendency,
             aiAnalysis: {
               summary: data.summary,
               clientExplanation: data.clientExplanation,
@@ -698,6 +739,7 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
               suggestedWhatsApp: data.suggestedWhatsApp,
               deadlineDays: data.deadlineDays,
               deadlineType: data.deadlineType,
+              tendency: data.tendency,
             },
           };
         }
@@ -833,6 +875,7 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
     const targetProc = processes.find((p) => p.id === movementTargetProcessId) || currentProcess;
     if (!targetProc || !newMovTitle) return;
 
+    const autoTendency = classifyMovementTendencyLocal(newMovTitle, newMovDescription);
     const newMov: ProcessMovement = {
       id: `mov-manual-${Date.now()}`,
       date: new Date().toISOString(),
@@ -841,6 +884,7 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
       description: newMovDescription,
       organ: newMovOrgan || targetProc.branchVara,
       isJudicialDecision: newMovIsDecision,
+      tendency: autoTendency,
     };
 
     onAddMovement(targetProc.id, newMov);
@@ -1170,6 +1214,31 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                                 <Calendar className="w-3 h-3" /> Audiência Designada
                               </span>
                             )}
+                            {(() => {
+                              const tendency = mov.tendency || mov.aiAnalysis?.tendency || classifyMovementTendencyLocal(mov.title, mov.description);
+                              if (tendency === 'Positiva') {
+                                return (
+                                  <span className="text-[10px] px-2.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1">
+                                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                    Tendência: Positiva
+                                  </span>
+                                );
+                              } else if (tendency === 'Negativa') {
+                                return (
+                                  <span className="text-[10px] px-2.5 py-0.5 rounded-md bg-rose-500/15 text-rose-400 font-bold border border-rose-500/30 flex items-center gap-1">
+                                    <TrendingDown className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                                    Tendência: Negativa
+                                  </span>
+                                );
+                              } else {
+                                return (
+                                  <span className="text-[10px] px-2.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold border border-slate-700 flex items-center gap-1">
+                                    <Scale className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                    Tendência: Neutra
+                                  </span>
+                                );
+                              }
+                            })()}
                             <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
                               Código: {mov.code}
                             </span>
@@ -1725,7 +1794,7 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                             <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
                               <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-semibold text-slate-400">
                                       {new Date(mov.date).toLocaleDateString('pt-BR', {
                                         day: '2-digit',
@@ -1740,6 +1809,31 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                                         Decisão Judicial / Despacho
                                       </span>
                                     )}
+                                    {(() => {
+                                      const tendency = mov.tendency || mov.aiAnalysis?.tendency || classifyMovementTendencyLocal(mov.title, mov.description);
+                                      if (tendency === 'Positiva') {
+                                        return (
+                                          <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1">
+                                            <TrendingUp className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                            Tendência: Positiva
+                                          </span>
+                                        );
+                                      } else if (tendency === 'Negativa') {
+                                        return (
+                                          <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 font-bold border border-rose-500/30 flex items-center gap-1">
+                                            <TrendingDown className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                                            Tendência: Negativa
+                                          </span>
+                                        );
+                                      } else {
+                                        return (
+                                          <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-bold border border-slate-700 flex items-center gap-1">
+                                            <Scale className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                            Tendência: Neutra
+                                          </span>
+                                        );
+                                      }
+                                    })()}
                                   </div>
                                   <h4 className="text-sm font-bold text-slate-100 mt-1">
                                     {mov.title}
@@ -1771,15 +1865,28 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                                     <span className="font-bold text-amber-400 flex items-center gap-1.5">
                                       <Sparkles className="w-3.5 h-3.5" /> Análise com IA Jurídica:
                                     </span>
-                                    {mov.aiAnalysis.urgency && (
-                                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
-                                        mov.aiAnalysis.urgency === 'alta' || mov.aiAnalysis.urgency === 'fatal'
-                                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                                          : 'bg-emerald-500/20 text-emerald-300'
-                                      }`}>
-                                        Urgência: {mov.aiAnalysis.urgency}
-                                      </span>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                      {mov.aiAnalysis.tendency && (
+                                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                          mov.aiAnalysis.tendency === 'Positiva'
+                                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                            : mov.aiAnalysis.tendency === 'Negativa'
+                                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                            : 'bg-slate-800 text-slate-300 border border-slate-700'
+                                        }`}>
+                                          Tendência: {mov.aiAnalysis.tendency}
+                                        </span>
+                                      )}
+                                      {mov.aiAnalysis.urgency && (
+                                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                          mov.aiAnalysis.urgency === 'alta' || mov.aiAnalysis.urgency === 'fatal'
+                                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                            : 'bg-emerald-500/20 text-emerald-300'
+                                        }`}>
+                                          Urgência: {mov.aiAnalysis.urgency}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
 
                                   <div className="space-y-1">

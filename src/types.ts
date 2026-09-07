@@ -49,6 +49,7 @@ export interface ProcessMovementAIAnalysis {
   suggestedWhatsApp: string;
   deadlineDays?: number;
   deadlineType?: 'Úteis' | 'Corridos';
+  tendency?: 'Positiva' | 'Negativa' | 'Neutra';
 }
 
 export interface ProcessMovement {
@@ -63,6 +64,7 @@ export interface ProcessMovement {
   deadlineType?: 'Úteis' | 'Corridos';
   deadlineDate?: string;
   aiAnalysis?: ProcessMovementAIAnalysis;
+  tendency?: 'Positiva' | 'Negativa' | 'Neutra';
 }
 
 export type DeadlineStatus = 'pendente' | 'cumprido' | 'alerta' | 'atrasado';

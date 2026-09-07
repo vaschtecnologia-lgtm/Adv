@@ -53,6 +53,28 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
   const [downloadingDocType, setDownloadingDocType] = useState<string | null>(null);
   const [wordExportSuccess, setWordExportSuccess] = useState<string | null>(null);
 
+  // Astrea-style WhatsApp Communication Hub States
+  const [selectedTemplate, setSelectedTemplate] = useState<'welcome' | 'update' | 'hearing' | 'signature'>('welcome');
+  const [customMsgText, setCustomMsgText] = useState('');
+
+  const getTemplateText = (tpl: 'welcome' | 'update' | 'hearing' | 'signature', clientName: string): string => {
+    const officeName = office?.officeName || 'WONO ADVOCACIA';
+    const lawyerName = office?.primaryLawyer?.name || 'Dr. Vagner Schmidt';
+    
+    switch (tpl) {
+      case 'welcome':
+        return `Olá, ${clientName}! Tudo bem?\n\nBoas-vindas ao nosso escritório *${officeName}*. Estamos muito felizes em poder representar você.\n\nPara iniciarmos a elaboração da sua Procuração e Contrato de Honorários, solicitamos a gentileza de nos enviar fotos legíveis dos seguintes documentos:\n• RG e CPF (ou CNH)\n• Comprovante de residência recente\n• Comprovante de renda (opcional para gratuidade)\n\nFicamos à disposição para esclarecer qualquer dúvida!\n\nAtenciosamente,\n*${lawyerName}*`;
+      case 'update':
+        return `Olá, ${clientName}!\n\nPassando para informar que tivemos uma movimentação importante em seu processo judicial recente.\n\nNossa banca de advogados já está acompanhando o caso e tomando as medidas processuais cabíveis dentro do prazo oficial. Não se preocupe, continuaremos cuidando de tudo por aqui!\n\nQualquer novidade relevante, entraremos em contato.\n\nAtenciosamente,\n*${officeName}*`;
+      case 'hearing':
+        return `Olá, ${clientName}!\n\nInformamos que foi agendada uma audiência judicial para o seu caso.\n\n• Data: ____/____/2026\n• Horário: ____:____\n\nPor favor, guarde esta data com atenção. Nossa equipe agendará uma reunião preparatória com você alguns dias antes para passar todas as orientações e treinar seu depoimento.\n\nAtenciosamente,\n*${officeName}*`;
+      case 'signature':
+        return `Olá, ${clientName}!\n\nAs minutas oficiais da sua Procuração e do seu Contrato de Honorários já estão prontas para a sua assinatura.\n\nPrecisamos coletar sua assinatura para que possamos protocolar a ação judicial em seu nome o quanto antes.\n\nVocê pode assinar diretamente via documento digital que enviamos ou agendar um horário para assinar em nossa recepção física.\n\nAtenciosamente,\n*${officeName}*`;
+      default:
+        return '';
+    }
+  };
+
   // Delete Confirmation Modal State
   const [deleteConfirmModal, setDeleteConfirmModal] = useState<{
     isOpen: boolean;
@@ -118,6 +140,13 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) || clients[0];
   const clientProcesses = processes.filter((p) => p.clientId === selectedClient?.id);
+
+  // Sync draft message text with client selection and selected template (Astrea Style)
+  React.useEffect(() => {
+    if (selectedClient) {
+      setCustomMsgText(getTemplateText(selectedTemplate, selectedClient.name));
+    }
+  }, [selectedClientId, selectedTemplate, office]);
 
   const filteredClients = clients.filter((c) => {
     if (!searchQuery.trim()) return true;
@@ -597,6 +626,72 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Central de Comunicação WhatsApp (Astrea Style) */}
+              <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-200 text-sm flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-emerald-400" />
+                    Central de Comunicação (WhatsApp) Astrea Style
+                  </h4>
+                  <span className="text-[10px] bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold px-2 py-0.5 rounded-full uppercase">
+                    Modelos Rápidos
+                  </span>
+                </div>
+                
+                <p className="text-[11px] text-slate-400 leading-normal">
+                  Selecione um modelo de aviso corporativo profissional para o seu cliente, revise o texto abaixo e dispare diretamente para o WhatsApp dele em um clique.
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">
+                      Escolha o Assunto / Modelo de Mensagem:
+                    </label>
+                    <select
+                      value={selectedTemplate}
+                      onChange={(e) => setSelectedTemplate(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="welcome">👋 Boas-vindas & Solicitação de Documentos Iniciais</option>
+                      <option value="update">⚖️ Atualização de Andamento Favorável no Processo</option>
+                      <option value="hearing">📅 Notificação de Agendamento de Audiência</option>
+                      <option value="signature">✍️ Solicitação de Assinatura de Procuração/Contrato</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 font-semibold mb-1">
+                      Pré-visualização e Edição do Texto:
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={customMsgText}
+                      onChange={(e) => setCustomMsgText(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-500 font-sans focus:outline-none focus:border-emerald-500 leading-relaxed text-[11px]"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-900">
+                    <div className="text-slate-400 text-[11px]">
+                      Destinatário: <strong className="text-slate-200">{selectedClient.name}</strong> ({selectedClient.phone})
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cleanPhone = selectedClient.phone.replace(/\D/g, '');
+                        const fullPhone = cleanPhone.length === 11 || cleanPhone.length === 10 ? `55${cleanPhone}` : cleanPhone;
+                        const url = `https://api.whatsapp.com/send?phone=${fullPhone}&text=${encodeURIComponent(customMsgText)}`;
+                        window.open(url, '_blank');
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer shadow shadow-emerald-950/40 focus:outline-none"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Disparar no WhatsApp
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           ) : (

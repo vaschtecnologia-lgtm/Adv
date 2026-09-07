@@ -68,6 +68,7 @@ interface SaasViewProps {
   onDeleteFinancialRecord: (id: string) => void;
   onImportFullBackup?: (importedData: any) => void;
   onOpenDatabaseInstaller?: () => void;
+  activeUser?: TeamMember;
 }
 
 export const SaasView: React.FC<SaasViewProps> = ({
@@ -93,6 +94,7 @@ export const SaasView: React.FC<SaasViewProps> = ({
   onDeleteFinancialRecord,
   onImportFullBackup = (_importedData: any) => {},
   onOpenDatabaseInstaller,
+  activeUser,
 }) => {
   const tenantConfig = propTenantConfig || propSaasConfig || {
     tenantId: 'wono-main',
@@ -122,7 +124,16 @@ export const SaasView: React.FC<SaasViewProps> = ({
     if (onUpdateSaasConfig) onUpdateSaasConfig(config);
   };
 
-  const [activeSubTab, setActiveSubTab] = useState<'equipe' | 'financeiro' | 'planos' | 'auditoria' | 'banco-dados' | 'deploy-netlify'>('equipe');
+  const isGeneralAdmin = activeUser?.role === 'Sócio Administrador' || activeUser?.privilege === 'total';
+
+  const [activeSubTab, setActiveSubTabState] = useState<'equipe' | 'financeiro' | 'planos' | 'auditoria' | 'banco-dados' | 'deploy-netlify'>(() => {
+    return (localStorage.getItem('wono_saas_active_subtab') as any) || 'equipe';
+  });
+
+  const setActiveSubTab = (tab: 'equipe' | 'financeiro' | 'planos' | 'auditoria' | 'banco-dados' | 'deploy-netlify') => {
+    localStorage.setItem('wono_saas_active_subtab', tab);
+    setActiveSubTabState(tab);
+  };
 
   // Search and filters
   const [teamSearch, setTeamSearch] = useState('');
@@ -548,7 +559,11 @@ export const SaasView: React.FC<SaasViewProps> = ({
               : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-850'
           }`}
         >
-          <DollarSign className="w-4 h-4" />
+          {isGeneralAdmin ? (
+            <DollarSign className="w-4 h-4" />
+          ) : (
+            <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          )}
           Financeiro & Honorários SaaS ({financialRecords.length})
         </button>
 
@@ -717,45 +732,70 @@ export const SaasView: React.FC<SaasViewProps> = ({
 
       {/* Subtab 2: Financeiro & Honorários SaaS (CRUD) */}
       {activeSubTab === 'financeiro' && (
-        <div className="space-y-6">
-          {/* Financial Metrics Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-2">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-                <span>Total Faturado</span>
-                <DollarSign className="w-4 h-4 text-emerald-400" />
-              </div>
-              <div className="text-2xl font-black text-slate-100">{formatCurrencyBRL(totalReceitas)}</div>
-              <p className="text-[11px] text-slate-400">Honorários contratuais e êxito</p>
+        !isGeneralAdmin ? (
+          <div className="bg-slate-900 border border-slate-850 rounded-2xl p-8 max-w-lg mx-auto text-center space-y-5 my-12 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-amber-500"></div>
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shadow-xl mx-auto">
+              <Lock className="w-8 h-8 animate-bounce" />
             </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-2">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-                <span>Recebido / Liquidado</span>
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              </div>
-              <div className="text-2xl font-black text-emerald-400">{formatCurrencyBRL(totalRecebido)}</div>
-              <p className="text-[11px] text-emerald-400/80">Quitado em conta / PIX</p>
+            <div className="space-y-2">
+              <h3 className="text-base font-extrabold text-slate-100">Acesso Financeiro Restrito</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Você está tentando acessar o módulo de controle de fluxo de caixa, receitas judiciais e lançamentos de honorários contratuais da banca jurídica.
+              </p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Suas permissões atuais (<strong>{activeUser?.privilege === 'parcial' ? 'Parcial' : 'Leitura'}</strong>) não autorizam a visualização ou alteração de dados financeiros. Entre em contato com o <strong>Sócio Administrador Geral</strong> para revogar restrições.
+              </p>
             </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-2">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-                <span>A Receber / Parcelas</span>
-                <Clock className="w-4 h-4 text-amber-400" />
-              </div>
-              <div className="text-2xl font-black text-amber-400">{formatCurrencyBRL(totalPendente)}</div>
-              <p className="text-[11px] text-amber-400/80">Parcelas futuras e êxito previsto</p>
-            </div>
-
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-2">
-              <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
-                <span>Despesas & Custas</span>
-                <AlertCircle className="w-4 h-4 text-red-400" />
-              </div>
-              <div className="text-2xl font-black text-red-400">{formatCurrencyBRL(totalDespesas)}</div>
-              <p className="text-[11px] text-slate-400">Guias, diligências e operacionais</p>
+            <div className="pt-3 border-t border-slate-800">
+              <button
+                onClick={() => setActiveSubTab('equipe')}
+                className="px-5 py-2.5 bg-slate-850 hover:bg-slate-800 text-slate-200 hover:text-slate-100 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 mx-auto cursor-pointer"
+              >
+                <span>Voltar para Gestão de Equipe</span>
+              </button>
             </div>
           </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Financial Metrics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-2">
+                <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                  <span>Total Faturado</span>
+                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="text-2xl font-black text-slate-100">{formatCurrencyBRL(totalReceitas)}</div>
+                <p className="text-[11px] text-slate-400">Honorários contratuais e êxito</p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-2">
+                <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                  <span>Recebido / Liquidado</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="text-2xl font-black text-emerald-400">{formatCurrencyBRL(totalRecebido)}</div>
+                <p className="text-[11px] text-emerald-400/80">Quitado em conta / PIX</p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-2">
+                <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                  <span>A Receber / Parcelas</span>
+                  <Clock className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="text-2xl font-black text-amber-400">{formatCurrencyBRL(totalPendente)}</div>
+                <p className="text-[11px] text-amber-400/80">Parcelas futuras e êxito previsto</p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-2">
+                <div className="flex items-center justify-between text-slate-400 text-xs font-semibold">
+                  <span>Despesas & Custas</span>
+                  <AlertCircle className="w-4 h-4 text-red-400" />
+                </div>
+                <div className="text-2xl font-black text-red-400">{formatCurrencyBRL(totalDespesas)}</div>
+                <p className="text-[11px] text-slate-400">Guias, diligências e operacionais</p>
+              </div>
+            </div>
 
           {/* Financial Filter & Create Action */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -878,7 +918,8 @@ export const SaasView: React.FC<SaasViewProps> = ({
             </div>
           </div>
         </div>
-      )}
+      )
+    )}
 
       {/* Subtab 3: Planos & Assinatura WONO */}
       {activeSubTab === 'planos' && (
