@@ -28,6 +28,7 @@ interface MasterResetModalProps {
     financialCount: number;
   };
   onDownloadBackup?: () => void;
+  deletionPassword?: string;
 }
 
 export const MasterResetModal: React.FC<MasterResetModalProps> = ({
@@ -36,6 +37,7 @@ export const MasterResetModal: React.FC<MasterResetModalProps> = ({
   onConfirmReset,
   stats,
   onDownloadBackup,
+  deletionPassword,
 }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -48,8 +50,11 @@ export const MasterResetModal: React.FC<MasterResetModalProps> = ({
     setError('');
 
     const cleanInput = password.trim();
-    if (cleanInput !== '1414') {
-      setError('Senha incorreta! Digite a senha master autorizada para prosseguir com a exclusão geral.');
+    const isMasterPassword = cleanInput === '1414';
+    const isUserDeletionPassword = deletionPassword && cleanInput === deletionPassword.trim();
+
+    if (!isMasterPassword && !isUserDeletionPassword) {
+      setError(`Senha incorreta! Digite a senha master autorizada (1414) ou sua senha de exclusão cadastrada${deletionPassword ? ` (${deletionPassword})` : ''} para prosseguir com a exclusão geral.`);
       return;
     }
 
@@ -176,9 +181,9 @@ export const MasterResetModal: React.FC<MasterResetModalProps> = ({
           <div className="space-y-2">
             <label className="block text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-rose-400" /> Digite a Senha Master:
+                <Lock className="w-3.5 h-3.5 text-rose-400" /> Confirmar com Senha Master ou Exclusão:
               </span>
-              <span className="text-[11px] text-slate-400 font-normal">Autenticação de Segurança</span>
+              <span className="text-[11px] text-slate-400 font-normal">Autenticação</span>
             </label>
             <input
               type="password"
@@ -188,7 +193,7 @@ export const MasterResetModal: React.FC<MasterResetModalProps> = ({
                 setPassword(e.target.value);
                 setError('');
               }}
-              placeholder="Digite a senha master..."
+              placeholder="Digite a senha (1414 ou de exclusão)..."
               className="w-full px-4 py-3 bg-slate-950 border-2 border-rose-500/40 rounded-xl text-center text-lg font-mono font-black text-rose-300 placeholder-slate-600 focus:outline-none focus:border-rose-500 tracking-widest"
             />
             {error && (

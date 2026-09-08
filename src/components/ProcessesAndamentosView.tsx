@@ -103,6 +103,7 @@ interface ProcessesAndamentosViewProps {
   onAddTeamMember?: (member: Omit<TeamMember, 'id' | 'createdAt'>) => void;
   deadlines?: ProcessDeadline[];
   onUpdateDeadline?: (deadline: ProcessDeadline) => void;
+  activeUser?: any;
 }
 
 export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = ({
@@ -125,6 +126,7 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
   onAddTeamMember,
   deadlines,
   onUpdateDeadline,
+  activeUser,
 }) => {
   // Main view mode: 'feed' (all movements & publications), 'process' (by process), 'search' (datajud online search), 'oab_sync' (batch OAB sync), 'calculator' (costs calculator)
   const [viewMode, setViewMode] = useState<'feed' | 'process' | 'search' | 'oab_sync' | 'calculator'>('feed');
@@ -156,7 +158,70 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
   const [onlineResults, setOnlineResults] = useState<any[] | null>(null);
 
   // Subtab for individual process
-  const [activeProcessTab, setActiveProcessTab] = useState<'movements' | 'details'>('movements');
+  const [activeProcessTab, setActiveProcessTab] = useState<'movements' | 'details' | 'jurisprudence'>('movements');
+
+  // Jurisprudence Search State (Google Grounded Search)
+  const [jurisprudenceQuery, setJurisprudenceQuery] = useState('');
+  const [jurisprudenceCourt, setJurisprudenceCourt] = useState('');
+  const [isSearchingJurisprudence, setIsSearchingJurisprudence] = useState(false);
+  const [jurisprudenceResults, setJurisprudenceResults] = useState<{
+    synthesis: string;
+    precedents: Array<{
+      court: string;
+      caseNumber: string;
+      relator?: string;
+      judgmentDate: string;
+      thesis: string;
+      excerpt: string;
+      url?: string;
+    }>;
+    recommendedThesis: string;
+    searchKeywords: string[];
+  } | null>(null);
+  const [jurisprudenceError, setJurisprudenceError] = useState<string | null>(null);
+
+  // Auto-populate jurisprudence search query when selected process changes
+  useEffect(() => {
+    if (currentProcess) {
+      setJurisprudenceQuery(currentProcess.subject || '');
+      // Try to extract court abbreviation (e.g. "TJSP" or "TRT2")
+      const courtPart = currentProcess.court ? currentProcess.court.split(' ')[0] : '';
+      setJurisprudenceCourt(courtPart);
+      setJurisprudenceResults(null);
+      setJurisprudenceError(null);
+    }
+  }, [selectedProcessId]);
+
+  const handleSearchJurisprudence = async () => {
+    if (!jurisprudenceQuery.trim()) return;
+
+    setIsSearchingJurisprudence(true);
+    setJurisprudenceError(null);
+    try {
+      const response = await fetch('/api/gemini/jurisprudencia', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: jurisprudenceQuery,
+          court: jurisprudenceCourt
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Falha ao consultar jurisprudência no servidor.');
+      }
+
+      const data = await response.json();
+      setJurisprudenceResults(data);
+    } catch (err: any) {
+      console.error(err);
+      setJurisprudenceError(err.message || 'Erro inesperado ao pesquisar jurisprudência.');
+    } finally {
+      setIsSearchingJurisprudence(false);
+    }
+  };
 
   // Status Tags (Etiquetas) & Quick Filter States
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
@@ -370,9 +435,9 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
   const [isProcessModalOpen, setIsProcessModalOpen] = useState(false);
   const [editingProcessId, setEditingProcessId] = useState<string | null>(null);
   const [processCnjNumber, setProcessCnjNumber] = useState('');
-  const [processCourt, setProcessCourt] = useState('TJSP - Tribunal de Justiça de São Paulo');
+  const [processCourt, setProcessCourt] = useState('TJGO - Tribunal de Justiça do Estado de Goiás');
   const [processBranchVara, setProcessBranchVara] = useState('1ª Vara Cível');
-  const [processComarca, setProcessComarca] = useState('São Paulo / SP');
+  const [processComarca, setProcessComarca] = useState('Goiânia / GO');
   const [processLawsuitType, setProcessLawsuitType] = useState('Procedimento Comum Cível');
   const [processSubject, setProcessSubject] = useState('Indenização por Danos Morais e Materiais');
   const [processValue, setProcessValue] = useState(50000);
@@ -407,7 +472,7 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
   const [substabSelectedMemberId, setSubstabSelectedMemberId] = useState<string>('');
   const [substabCustomName, setSubstabCustomName] = useState('');
   const [substabCustomOAB, setSubstabCustomOAB] = useState('');
-  const [substabCustomUF, setSubstabCustomUF] = useState('SP');
+  const [substabCustomUF, setSubstabCustomUF] = useState('GO');
   const [substabCustomEmail, setSubstabCustomEmail] = useState('');
   const [substabCustomPhone, setSubstabCustomPhone] = useState('');
   const [substabWithReserve, setSubstabWithReserve] = useState(true);
@@ -606,9 +671,9 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
   const handleOpenNewProcessModal = () => {
     setEditingProcessId(null);
     setProcessCnjNumber('');
-    setProcessCourt('TJSP - Tribunal de Justiça de São Paulo');
+    setProcessCourt('TJGO - Tribunal de Justiça do Estado de Goiás');
     setProcessBranchVara('1ª Vara Cível');
-    setProcessComarca('São Paulo / SP');
+    setProcessComarca('Goiânia / GO');
     setProcessLawsuitType('Procedimento Comum Cível');
     setProcessSubject('Indenização por Danos Morais e Materiais');
     setProcessValue(50000);
@@ -893,6 +958,17 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
 
   return (
     <div className="space-y-6">
+      {/* Warning Banner for Read-Only Mode */}
+      {activeUser?.privilege === 'leitura' && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl p-4 text-xs flex items-center gap-3">
+          <span className="text-base">⚠️</span>
+          <span>
+            <strong>Modo de Leitura Ativo:</strong> Seu operador atual (<strong>{activeUser?.name}</strong>) possui privilégio de acesso restrito (<em>Leitura</em>). 
+            Você pode consultar e realizar buscas em Diários de Justiça, mas lançar andamentos, cadastrar processos, ou alterar dados está bloqueado.
+          </span>
+        </div>
+      )}
+
       {/* Top Banner with Stats & Navigation Controls */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -930,16 +1006,28 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
             </button>
             <button
               onClick={() => handleOpenAddMovementModal()}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+              disabled={activeUser?.privilege === 'leitura'}
+              className={`px-3.5 py-2 border rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-sm ${
+                activeUser?.privilege === 'leitura'
+                  ? 'bg-slate-850 border-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer'
+              }`}
+              title={activeUser?.privilege === 'leitura' ? 'Ação indisponível em modo leitura' : 'Lançar novo andamento'}
             >
-              <Plus className="w-4 h-4 text-amber-400" />
+              <Plus className={`w-4 h-4 ${activeUser?.privilege === 'leitura' ? 'text-slate-600' : 'text-amber-400'}`} />
               Lançar Andamento
             </button>
             <button
               onClick={handleOpenNewProcessModal}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow-sm"
+              disabled={activeUser?.privilege === 'leitura'}
+              className={`px-3.5 py-2 border rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm ${
+                activeUser?.privilege === 'leitura'
+                  ? 'bg-slate-850 border-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer'
+              }`}
+              title={activeUser?.privilege === 'leitura' ? 'Ação indisponível em modo leitura' : 'Cadastrar novo processo judicial'}
             >
-              <Plus className="w-4 h-4 text-amber-400" />
+              <Plus className={`w-4 h-4 ${activeUser?.privilege === 'leitura' ? 'text-slate-600' : 'text-amber-400'}`} />
               Cadastrar Processo
             </button>
           </div>
@@ -1629,26 +1717,41 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={() => handleOpenEditProcessModal(currentProcess)}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
-                      title="Editar informações do processo"
+                      disabled={activeUser?.privilege === 'leitura'}
+                      className={`px-3 py-1.5 border rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                        activeUser?.privilege === 'leitura'
+                          ? 'bg-slate-850 text-slate-500 border-slate-800 cursor-not-allowed'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer'
+                      }`}
+                      title={activeUser?.privilege === 'leitura' ? 'Edição bloqueada' : 'Editar informações do processo'}
                     >
-                      <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                      <Edit3 className={`w-3.5 h-3.5 ${activeUser?.privilege === 'leitura' ? 'text-slate-600' : 'text-amber-400'}`} />
                       Editar Processo
                     </button>
 
                     <button
                       onClick={() => handleOpenSubstabelecerModal(currentProcess)}
-                      className="px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
-                      title="Mudar ou substabelecer advogado com ou sem reserva de poderes"
+                      disabled={activeUser?.privilege === 'leitura'}
+                      className={`px-3 py-1.5 border rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                        activeUser?.privilege === 'leitura'
+                          ? 'bg-slate-850 text-slate-500 border-slate-800 cursor-not-allowed'
+                          : 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border-blue-500/40 cursor-pointer'
+                      }`}
+                      title={activeUser?.privilege === 'leitura' ? 'Substabelecimento bloqueado' : 'Mudar ou substabelecer advogado'}
                     >
-                      <Users className="w-3.5 h-3.5 text-blue-400" />
+                      <Users className={`w-3.5 h-3.5 ${activeUser?.privilege === 'leitura' ? 'text-slate-600' : 'text-blue-400'}`} />
                       Substabelecer Poderes
                     </button>
 
                     <button
                       onClick={() => setDeleteProcessConfirm({ isOpen: true, process: currentProcess })}
-                      className="px-3 py-1.5 bg-red-950/30 hover:bg-red-900/50 text-red-400 border border-red-800/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
-                      title="Excluir este processo"
+                      disabled={activeUser?.privilege === 'leitura'}
+                      className={`px-3 py-1.5 border rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                        activeUser?.privilege === 'leitura'
+                          ? 'bg-slate-850 text-slate-500 border-slate-800 cursor-not-allowed'
+                          : 'bg-red-950/30 hover:bg-red-900/50 text-red-400 border-red-800/40 cursor-pointer'
+                      }`}
+                      title={activeUser?.privilege === 'leitura' ? 'Exclusão bloqueada' : 'Excluir este processo'}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       Excluir
@@ -1656,8 +1759,13 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
 
                     <button
                       onClick={() => onOpenDocumentGeneratorForProcess(currentProcess)}
-                      className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
-                      title="Emitir Procuração ou Contrato com os dados deste processo"
+                      disabled={activeUser?.privilege === 'leitura'}
+                      className={`px-3 py-1.5 border rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
+                        activeUser?.privilege === 'leitura'
+                          ? 'bg-slate-850 text-slate-500 border-slate-800 cursor-not-allowed'
+                          : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40 cursor-pointer'
+                      }`}
+                      title={activeUser?.privilege === 'leitura' ? 'Ação bloqueada' : 'Emitir Procuração ou Contrato'}
                     >
                       <FileText className="w-3.5 h-3.5" />
                       Gerar Procuração / Contrato
@@ -1665,17 +1773,22 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
 
                     <button
                       onClick={() => onOpenDeclaracaoGeneratorForProcess && onOpenDeclaracaoGeneratorForProcess(currentProcess)}
-                      className="px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
-                      title="Gerar Declaração de Hipossuficiência Financeira para o cliente deste processo"
+                      disabled={activeUser?.privilege === 'leitura'}
+                      className={`px-3 py-1.5 border rounded-lg text-xs font-semibold transition flex items-center gap-1.5 ${
+                        activeUser?.privilege === 'leitura'
+                          ? 'bg-slate-850 text-slate-500 border-slate-800 cursor-not-allowed'
+                          : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40 cursor-pointer'
+                      }`}
+                      title={activeUser?.privilege === 'leitura' ? 'Ação bloqueada' : 'Gerar Declaração de Hipossuficiência'}
                     >
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <ShieldCheck className={`w-3.5 h-3.5 ${activeUser?.privilege === 'leitura' ? 'text-slate-600' : 'text-emerald-400'}`} />
                       Gerar Declaração de Hipossuficiência
                     </button>
                   </div>
                 </div>
 
                 {/* Subtabs for process */}
-                <div className="flex items-center gap-2 border-b border-slate-800 pb-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-2 text-xs">
                   <button
                     onClick={() => setActiveProcessTab('movements')}
                     className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
@@ -1695,6 +1808,17 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                     }`}
                   >
                     Dados Cadastrais & Partes
+                  </button>
+                  <button
+                    onClick={() => setActiveProcessTab('jurisprudence')}
+                    className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer flex items-center gap-1 ${
+                      activeProcessTab === 'jurisprudence'
+                        ? 'bg-amber-500 text-slate-950 font-bold'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Pesquisa de Jurisprudência IA
                   </button>
                 </div>
 
@@ -1982,6 +2106,207 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                     </div>
                   </div>
                 )}
+
+                {/* Tab 3: Jurisprudence Search with Google Grounded Search */}
+                {activeProcessTab === 'jurisprudence' && (
+                  <div className="space-y-5">
+                    <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+                          <Brain className="w-4 h-4 text-amber-400" />
+                          Pesquisa de Precedentes & Jurisprudência (Google Grounded Search)
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                          Consulte os entendimentos mais recentes do STF, STJ, TJs e TRTs em tempo real utilizando o buscador de IA.
+                          Os resultados serão baseados em consultas ao vivo indexadas na web.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div className="sm:col-span-3 space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase">Termo / Assunto de Pesquisa</label>
+                          <input
+                            type="text"
+                            value={jurisprudenceQuery}
+                            onChange={(e) => setJurisprudenceQuery(e.target.value)}
+                            placeholder="Ex: indenização por dano moral atraso de voo overbooking"
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase">Tribunal Alvo</label>
+                          <input
+                            type="text"
+                            value={jurisprudenceCourt}
+                            onChange={(e) => setJurisprudenceCourt(e.target.value)}
+                            placeholder="Ex: TJSP, STJ, TRT2"
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            if (currentProcess) {
+                              setJurisprudenceQuery(currentProcess.subject || '');
+                              const courtPart = currentProcess.court ? currentProcess.court.split(' ')[0] : '';
+                              setJurisprudenceCourt(courtPart);
+                            }
+                          }}
+                          className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-semibold cursor-pointer transition"
+                        >
+                          Restaurar Original
+                        </button>
+                        <button
+                          onClick={handleSearchJurisprudence}
+                          disabled={isSearchingJurisprudence || !jurisprudenceQuery.trim()}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 disabled:bg-slate-800 disabled:text-slate-500 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer transition shadow-md shadow-amber-950/20"
+                        >
+                          {isSearchingJurisprudence ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></div>
+                              <span>Pesquisando no Google...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Search className="w-3.5 h-3.5 text-slate-950 font-extrabold" />
+                              <span>Buscar Jurisprudência Ao Vivo</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {isSearchingJurisprudence && (
+                      <div className="bg-slate-950 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
+                        <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                        <p className="text-xs text-slate-300 font-semibold">Consultando base de dados do Google Search e Tribunais...</p>
+                        <p className="text-[11px] text-slate-500">Mapeando acórdãos recentes, recursos especiais repetitivos, súmulas e ementas correlatas.</p>
+                      </div>
+                    )}
+
+                    {jurisprudenceError && (
+                      <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 text-xs text-rose-300 flex items-start gap-2">
+                        <div className="bg-rose-500/20 p-1 rounded">⚠️</div>
+                        <div className="space-y-1">
+                          <p className="font-bold">Erro ao realizar pesquisa de jurisprudência:</p>
+                          <p>{jurisprudenceError}</p>
+                          <button
+                            onClick={handleSearchJurisprudence}
+                            className="underline font-bold text-rose-400 hover:text-rose-300 block mt-1"
+                          >
+                            Tentar novamente
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {jurisprudenceResults && !isSearchingJurisprudence && (
+                      <div className="space-y-5">
+                        {/* Synthesis & Strategic Thesis */}
+                        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2.5">
+                            <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                              ⚖️ Entendimento Jurisprudencial Dominante (Síntese)
+                            </span>
+                            <div className="text-slate-300 text-xs leading-relaxed whitespace-pre-wrap font-sans text-justify">
+                              {jurisprudenceResults.synthesis}
+                            </div>
+                          </div>
+
+                          <div className="bg-gradient-to-r from-emerald-950/10 to-slate-950 p-4 rounded-xl border border-emerald-500/30 space-y-2">
+                            <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-wider flex items-center gap-1">
+                              🛡️ Tese Jurídica e Estratégia Sugerida para Peça
+                            </span>
+                            <p className="text-slate-200 text-xs leading-relaxed font-medium">
+                              {jurisprudenceResults.recommendedThesis}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Precedents Section */}
+                        <div className="space-y-3.5">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                            📂 Acórdãos e Precedentes Recentes Encontrados ({jurisprudenceResults.precedents?.length || 0})
+                          </span>
+
+                          <div className="space-y-4">
+                            {jurisprudenceResults.precedents?.map((prec, pIdx) => (
+                              <div key={pIdx} className="bg-slate-950 rounded-xl border border-slate-800/80 p-4 space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-900 pb-2">
+                                  <div className="space-y-0.5">
+                                    <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 font-bold border border-amber-500/20 mr-2">
+                                      {prec.court}
+                                    </span>
+                                    <span className="font-mono text-xs text-slate-200 font-extrabold">
+                                      {prec.caseNumber}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                                    {prec.relator && (
+                                      <span><strong>Relator(a):</strong> {prec.relator}</span>
+                                    )}
+                                    <span>•</span>
+                                    <span><strong>Julgamento:</strong> {prec.judgmentDate}</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <span className="text-[10px] text-slate-500 font-bold uppercase block">Ementa / Tese Firmada:</span>
+                                  <p className="text-slate-300 text-xs leading-relaxed">
+                                    {prec.thesis}
+                                  </p>
+                                </div>
+
+                                <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800 text-[11px] space-y-1">
+                                  <span className="text-[9px] text-slate-500 font-bold uppercase block">Trecho de Destaque:</span>
+                                  <p className="text-slate-400 italic leading-relaxed text-justify whitespace-pre-wrap">
+                                    "{prec.excerpt}"
+                                  </p>
+                                </div>
+
+                                {prec.url && (
+                                  <div className="flex justify-end pt-1">
+                                    <a
+                                      href={prec.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      referrerPolicy="no-referrer"
+                                      className="inline-flex items-center gap-1 text-[10px] text-amber-400 hover:text-amber-300 font-bold transition hover:underline"
+                                    >
+                                      <span>Visualizar Acórdão / Fonte</span>
+                                      <span className="text-xs">↗</span>
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Suggested Keywords tags */}
+                        {jurisprudenceResults.searchKeywords && jurisprudenceResults.searchKeywords.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 py-2 bg-slate-950 px-3 rounded-xl border border-slate-800/80">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase mr-1">Palavras-chave de Pesquisa Adicional:</span>
+                            {jurisprudenceResults.searchKeywords.map((kw, kwIdx) => (
+                              <span
+                                key={kwIdx}
+                                className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[10px] text-slate-300 font-medium cursor-pointer hover:bg-slate-800 transition"
+                                onClick={() => {
+                                  setJurisprudenceQuery(kw);
+                                }}
+                                title="Clique para carregar termo de pesquisa"
+                              >
+                                {kw}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 space-y-3">
@@ -2101,7 +2426,90 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                     value={processCourt}
                     onChange={(e) => setProcessCourt(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 focus:border-amber-500 focus:outline-none"
+                    placeholder="Ex: TJGO - Tribunal de Justiça do Estado de Goiás"
                   />
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProcessCourt('TJGO - Tribunal de Justiça do Estado de Goiás');
+                        setProcessComarca('Goiânia / GO');
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] text-amber-300 rounded border border-slate-700 hover:border-amber-500 transition cursor-pointer"
+                    >
+                      TJGO (Goiás)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProcessCourt('TJDFT - Tribunal de Justiça do Distrito Federal e dos Territórios');
+                        setProcessComarca('Brasília / DF');
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] text-amber-300 rounded border border-slate-700 hover:border-amber-500 transition cursor-pointer"
+                    >
+                      TJDFT (DF)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProcessCourt('TRT10 - Tribunal Regional do Trabalho da 10ª Região (DF/TO)');
+                        setProcessComarca('Brasília / DF');
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] text-amber-300 rounded border border-slate-700 hover:border-amber-500 transition cursor-pointer"
+                    >
+                      TRT10 (DF/TO)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProcessCourt('TRF1 - Tribunal Regional Federal da 1ª Região');
+                        setProcessComarca('Goiânia / GO');
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] text-amber-300 rounded border border-slate-700 hover:border-amber-500 transition cursor-pointer"
+                    >
+                      TRF1
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProcessCourt('STJ - Superior Tribunal de Justiça');
+                        setProcessComarca('Brasília / DF');
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] text-amber-300 rounded border border-slate-700 hover:border-amber-500 transition cursor-pointer"
+                    >
+                      STJ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProcessCourt('STF - Supremo Tribunal Federal');
+                        setProcessComarca('Brasília / DF');
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] text-amber-300 rounded border border-slate-700 hover:border-amber-500 transition cursor-pointer"
+                    >
+                      STF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProcessCourt('TJSP - Tribunal de Justiça de São Paulo');
+                        setProcessComarca('São Paulo / SP');
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] text-amber-300 rounded border border-slate-700 hover:border-amber-500 transition cursor-pointer"
+                    >
+                      TJSP (SP)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProcessCourt('TRT2 - Tribunal Regional do Trabalho da 2ª Região (SP)');
+                        setProcessComarca('São Paulo / SP');
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[10px] text-amber-300 rounded border border-slate-700 hover:border-amber-500 transition cursor-pointer"
+                    >
+                      TRT2 (SP)
+                    </button>
+                  </div>
                 </div>
 
                 <div>

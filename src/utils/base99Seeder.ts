@@ -273,8 +273,9 @@ export const executeBase99Installation = (
   localStorage.setItem('juris_clients', JSON.stringify(dataset.clients));
   localStorage.setItem('juris_processes', JSON.stringify(dataset.processes));
   localStorage.setItem('juris_deadlines', JSON.stringify(dataset.deadlines));
-  localStorage.setItem('juris_financial_records', JSON.stringify(dataset.financials));
-  localStorage.setItem('juris_audit_logs', JSON.stringify(dataset.auditLogs));
+  localStorage.setItem('wono_financial_records', JSON.stringify(dataset.financials));
+  localStorage.setItem('wono_audit_logs', JSON.stringify(dataset.auditLogs));
+  localStorage.setItem('wono_system_cleared', 'false');
 
   return dataset;
 };

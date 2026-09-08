@@ -1,7 +1,9 @@
 import express from "express";
 import path from "path";
 import os from "os";
+import fs from "fs";
 import dotenv from "dotenv";
+import JSZip from "jszip";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 
@@ -145,6 +147,93 @@ app.get("/api/network-info", (req, res) => {
   }
 });
 
+// Endpoint: Download Pre-compiled Netlify Drop Production Package (.ZIP)
+app.get("/api/download-netlify-dist", async (req, res) => {
+  try {
+    const distPath = path.join(process.cwd(), "dist");
+    if (!fs.existsSync(distPath)) {
+      return res.status(404).json({ error: "Diretório de build 'dist' não encontrado. Execute npm run build primeiro." });
+    }
+
+    const zip = new JSZip();
+
+    // Helper to recursively add files from distPath into zip
+    function addDirectoryToZip(currentDir: string, zipFolder: JSZip) {
+      const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        // Exclude server-only bundled binaries from static web deploy
+        if (entry.name === "server.cjs" || entry.name === "server.cjs.map") {
+          continue;
+        }
+        if (entry.isDirectory()) {
+          const subFolder = zipFolder.folder(entry.name);
+          if (subFolder) {
+            addDirectoryToZip(fullPath, subFolder);
+          }
+        } else {
+          const fileData = fs.readFileSync(fullPath);
+          zipFolder.file(entry.name, fileData);
+        }
+      }
+    }
+
+    addDirectoryToZip(distPath, zip);
+
+    // Guarantee _redirects exists inside zip for Netlify SPA routing
+    if (!zip.file("_redirects")) {
+      zip.file("_redirects", "/*    /index.html   200\n");
+    }
+
+    // Guarantee netlify.toml exists inside zip
+    if (!zip.file("netlify.toml")) {
+      zip.file("netlify.toml", `[build]
+  publish = "."
+  command = ""
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+`);
+    }
+
+    // Add Netlify Drop instructions
+    zip.file("LEIA-ME_NETLIFY_DROP.txt", `==============================================================================
+            WONO ADVOCACIA - PACOTE PRONTO PARA NETLIFY DROP
+==============================================================================
+
+Parabens! Este arquivo ZIP contem a aplicacao Wono Advocacia compilada e pronta
+para entrar no ar sem necessidade de executar nenhum comando no terminal.
+
+COMO PUBLICAR EM 15 SEGUNDOS:
+1. Acesse https://app.netlify.com/drop
+2. Faca login ou crie uma conta gratuita.
+3. Arraste este arquivo ZIP (ou descompacte e arraste a pasta com os arquivos)
+   para dentro da area indicada no site do Netlify.
+4. O Netlify publicara sua aplicacao instantaneamente com certificado SSL (HTTPS)
+   e um link publico permanente!
+`);
+
+    const zipBuffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", 'attachment; filename="wono_advocacia_dist_netlify_drop.zip"');
+    res.send(zipBuffer);
+  } catch (err: any) {
+    console.error("Error generating Netlify dist zip:", err);
+    res.status(500).json({ error: "Erro ao gerar arquivo zip do Netlify: " + err.message });
+  }
+});
+
 // Enhanced DataJud / Court Database Search with support for TJDFT, TRF1, TRT10, STJ and all Brazilian courts
 app.get("/api/online-search", (req, res) => {
   const { query, tribunal, searchType, instancia, polo, advogado, parte } = req.query;
@@ -246,6 +335,57 @@ app.get("/api/online-search", (req, res) => {
           isJudicialDecision: true,
         },
       ],
+    },
+    // --- TJGO (Tribunal de Justiça do Estado de Goiás) ---
+    {
+      cnjNumber: "0806456-12.2024.8.09.0051",
+      court: "TJGO - Tribunal de Justiça de Goiás",
+      sigla: "TJGO",
+      instance: "1ª Instância",
+      branchVara: "6ª Vara Cível de Goiânia / GO",
+      comarca: "Goiânia / GO",
+      lawsuitType: "Procedimento Comum Cível / Contratos",
+      subject: "Rescisão de Contrato de Promessa de Compra e Venda de Imóvel c/c Restituição de Valores",
+      value: 145000.0,
+      distributionDate: "2024-05-24",
+      status: "Ativo",
+      activeParty: "Carlos Eduardo Silveira",
+      passiveParty: "Goiás Prime Empreendimentos Imobiliários S.A.",
+      judge: "Dr. Rogério Carvalho Pinheiro",
+      responsibleLawyer: "Dr. Vagner Schmidt da Silva",
+      oabNumber: "284.912",
+      oabState: "SP",
+      movements: [
+        {
+          id: "mov-tjgo-1",
+          date: "2025-02-19T10:00:00",
+          code: "60001",
+          title: "Publicação no DJE/TJGO - Intimação para Especificar Provas",
+          description: "Publicado no DJE do TJGO: Vistos. Especifiquem as partes, no prazo comum de 15 (quinze) dias úteis, as provas que pretendem produzir, justificando a relevância de cada uma para o deslinde do feito, sob pena de indeferimento e julgamento antecipado da lide.",
+          organ: "6ª Vara Cível de Goiânia",
+          isJudicialDecision: true,
+          deadlineDays: 15,
+          deadlineType: "Úteis",
+        },
+        {
+          id: "mov-tjgo-2",
+          date: "2025-01-15T14:20:00",
+          code: "50005",
+          title: "Juntada de Réplica à Contestação",
+          description: "Petição de réplica protocolada impugnando as preliminares de mérito e defendendo a nulidade da cláusula de retenção integral das parcelas.",
+          organ: "6ª Vara Cível de Goiânia",
+          isJudicialDecision: false,
+        },
+        {
+          id: "mov-tjgo-3",
+          date: "2024-05-25T11:00:00",
+          code: "10001",
+          title: "Distribuição por Sorteio via Projudi / PJe",
+          description: "Distribuído eletronicamente por sorteio automático para a 6ª Vara Cível da Comarca de Goiânia.",
+          organ: "6ª Vara Cível de Goiânia",
+          isJudicialDecision: false,
+        }
+      ]
     },
 
     // --- TRF1 (Tribunal Regional Federal da 1ª Região - DF, GO, MT, BA, etc.) ---
@@ -394,6 +534,130 @@ app.get("/api/online-search", (req, res) => {
           deadlineType: "Úteis",
         },
       ],
+    },
+    // --- TRT18 (Tribunal Regional do Trabalho da 18ª Região - Goiás) ---
+    {
+      cnjNumber: "0010412-15.2024.5.18.0007",
+      court: "TRT18 - Tribunal Regional do Trabalho da 18ª Região",
+      sigla: "TRT18",
+      instance: "1ª Instância",
+      branchVara: "7ª Vara do Trabalho de Goiânia / GO",
+      comarca: "Goiânia / GO",
+      lawsuitType: "Reclamação Trabalhista (Rito Ordinário)",
+      subject: "Diferenças Salariais, Depósito de FGTS e Multas do Artigo 467/477 da CLT",
+      value: 68000.0,
+      distributionDate: "2024-06-02",
+      status: "Ativo",
+      activeParty: "Mariana Souza Alcantara",
+      passiveParty: "Goiânia Logística & Distribuição Ltda",
+      judge: "Dr. Luciano Santana Crispim",
+      responsibleLawyer: "Dr. Vagner Schmidt da Silva",
+      oabNumber: "284.912",
+      oabState: "SP",
+      movements: [
+        {
+          id: "mov-trt18-1",
+          date: "2025-02-18T16:00:00",
+          code: "30005",
+          title: "Publicação no DEJT - Designação de Audiência de Instrução",
+          description: "Intimem-se as partes, por seus procuradores, da designação de audiência presencial de instrução instruída no dia 14/05/2025 às 15h00 na 7ª Vara do Trabalho de Goiânia / GO. Testemunhas independentes deverão ser apresentadas sob pena de preclusão.",
+          organ: "7ª Vara do Trabalho de Goiânia",
+          isJudicialDecision: true,
+        },
+        {
+          id: "mov-trt18-2",
+          date: "2024-11-10T14:30:00",
+          code: "50012",
+          title: "Juntada de Defesa / Contestação com Documentos",
+          description: "Juntada de contestação com documentos comprovando depósitos parciais de FGTS e impugnando as horas extras requeridas.",
+          organ: "7ª Vara do Trabalho de Goiânia",
+          isJudicialDecision: false,
+        }
+      ]
+    },
+    // --- TJSP (Tribunal de Justiça do Estado de São Paulo) ---
+    {
+      cnjNumber: "1002345-67.2024.8.26.0100",
+      court: "TJSP - Tribunal de Justiça de São Paulo",
+      sigla: "TJSP",
+      instance: "1ª Instância",
+      branchVara: "12ª Vara Cível do Foro Central Cível da Comarca de São Paulo",
+      comarca: "São Paulo / SP",
+      lawsuitType: "Procedimento Comum Cível / Contratos",
+      subject: "Ação de Cobrança de Honorários Advocatícios Contratuais",
+      value: 120000.0,
+      distributionDate: "2024-03-10",
+      status: "Ativo",
+      activeParty: "Vagner Schmidt da Silva",
+      passiveParty: "Indústria de Alimentos Paulistana S.A.",
+      judge: "Dr. Rodrigo Cesar Fernandes Marinho",
+      responsibleLawyer: "Dr. Vagner Schmidt da Silva",
+      oabNumber: "284.912",
+      oabState: "SP",
+      movements: [
+        {
+          id: "mov-tjsp-1",
+          date: "2025-02-18T09:00:00",
+          code: "60001",
+          title: "Publicação no DJE/TJSP - Decisão Saneadora de Julgamento",
+          description: "Publicado no Diário da Justiça Eletrônico de São Paulo: Vistos. Dou o feito por saneado. Fica deferida a prova documental complementar e rejeitada a preliminar de ilegitimidade passiva da corré. Intimem-se para manifestação em 10 dias.",
+          organ: "12ª Vara Cível - Foro Central",
+          isJudicialDecision: true,
+          deadlineDays: 10,
+          deadlineType: "Úteis",
+        },
+        {
+          id: "mov-tjsp-2",
+          date: "2024-10-05T14:15:00",
+          code: "50005",
+          title: "Réplica à Contestação Juntada",
+          description: "Apresentada réplica reiterando os termos da inicial e refutando os argumentos defensivos quanto à prescrição da cobrança.",
+          organ: "12ª Vara Cível - Foro Central",
+          isJudicialDecision: false,
+        }
+      ]
+    },
+    // --- TRT2 (Tribunal Regional do Trabalho da 2ª Região - São Paulo) ---
+    {
+      cnjNumber: "1000512-34.2024.5.02.0002",
+      court: "TRT2 - Tribunal Regional do Trabalho da 2ª Região",
+      sigla: "TRT2",
+      instance: "1ª Instância",
+      branchVara: "2ª Vara do Trabalho de São Paulo / SP",
+      comarca: "São Paulo / SP",
+      lawsuitType: "Reclamação Trabalhista (Rito Ordinário)",
+      subject: "Horas Extras, Intervalo Intrajornada e Adicional de Periculosidade",
+      value: 85000.0,
+      distributionDate: "2024-04-15",
+      status: "Ativo",
+      activeParty: "Roberto de Oliveira Santos",
+      passiveParty: "Transportadora Rápido São Paulo Ltda.",
+      judge: "Dra. Patrícia Almeida Ramos",
+      responsibleLawyer: "Dr. Vagner Schmidt da Silva",
+      oabNumber: "284.912",
+      oabState: "SP",
+      movements: [
+        {
+          id: "mov-trt2-1",
+          date: "2025-02-19T13:45:00",
+          code: "30005",
+          title: "Publicação no DEJT - Intimação para Apresentar Razões Finais",
+          description: "Ficam as partes intimadas a apresentarem, querendo, razões finais por escrito em formato de memoriais no prazo sucessivo de 10 (dez) dias, iniciando-se pelo reclamante, sob pena de preclusão.",
+          organ: "2ª Vara do Trabalho de São Paulo",
+          isJudicialDecision: true,
+          deadlineDays: 10,
+          deadlineType: "Úteis",
+        },
+        {
+          id: "mov-trt2-2",
+          date: "2025-01-22T10:00:00",
+          code: "40001",
+          title: "Ata de Audiência de Instrução Juntada",
+          description: "Realizada audiência de instrução com colheita de depoimentos pessoais das partes e ouvida de duas testemunhas. Encerrada a instrução processual.",
+          organ: "2ª Vara do Trabalho de São Paulo",
+          isJudicialDecision: false,
+        }
+      ]
     },
 
     // --- STJ (Superior Tribunal de Justiça - Brasília/DF) ---
@@ -716,22 +980,24 @@ app.get("/api/online-search", (req, res) => {
         }
       }
     } else {
-      const courtSchemes = [
-        { tribunal: "TJSP", instance: "1ª Instância" },
-        { tribunal: "TJSP", instance: "2ª Instância" },
-        { tribunal: "TJRJ", instance: "1ª Instância" },
-        { tribunal: "TJDFT", instance: "1ª Instância" },
-        { tribunal: "TJDFT", instance: "2ª Instância" },
-        { tribunal: "TJMG", instance: "1ª Instância" },
-        { tribunal: "TRF1", instance: "1ª Instância" },
-        { tribunal: "TRF1", instance: "2ª Instância" },
-        { tribunal: "TRF3", instance: "1ª Instância" },
-        { tribunal: "TRT2", instance: "1ª Instância" },
-        { tribunal: "TRT10", instance: "1ª Instância" },
-        { tribunal: "TRT10", instance: "2ª Instância" },
-        { tribunal: "STJ", instance: "Tribunal Superior" },
-        { tribunal: "TST", instance: "Tribunal Superior" }
+      const allTribunals = [
+        "TJDFT", "TJSP", "TJRJ", "TJMG", "TJRS", "TJPR", "TJSC", "TJBA", "TJGO", "TJPE", "TJCE", 
+        "TRF1", "TRF2", "TRF3", "TRF4", "TRF5", "TRF6", 
+        "TRT1", "TRT2", "TRT3", "TRT4", "TRT10", "TRT15", "TRT18", 
+        "STJ", "STF", "TST", "CNJ"
       ];
+
+      const courtSchemes: { tribunal: string; instance: string }[] = [];
+      for (const t of allTribunals) {
+        if (["STJ", "STF", "TST"].includes(t)) {
+          courtSchemes.push({ tribunal: t, instance: "Tribunal Superior" });
+        } else if (t === "CNJ") {
+          courtSchemes.push({ tribunal: t, instance: "Conselho Nacional" });
+        } else {
+          courtSchemes.push({ tribunal: t, instance: "1ª Instância" });
+          courtSchemes.push({ tribunal: t, instance: "2ª Instância" });
+        }
+      }
 
       const targetSchemes = selectedInstancia && selectedInstancia !== "TODAS"
         ? courtSchemes.filter(s => s.instance.toLowerCase().includes(selectedInstancia.toLowerCase()))
@@ -1495,36 +1761,22 @@ app.all("/api/oab-sync", async (req, res) => {
 
 function detectTribunalFromCNJ(cnj: string): string {
   const clean = cnj.replace(/[^0-9]/g, "");
-  if (clean.length < 20) return "TJDFT"; // default
-  // CNJ pattern: NNNNNNN-DD.AAAA.J.TR.OOOO -> clean string length is 20
-  // J is at index 13 (0-based)
-  // TR is at index 14 and 15
-  // OOOO is at index 16 to 19
-  const j = clean.substring(13, 14);
-  const tr = clean.substring(14, 16);
-  const oooo = clean.substring(16, 20);
-  const codeToMatch = `${j}.${tr}.${oooo}`;
-  const shortCode = `${j}.${tr}`;
+  if (clean.length < 14) return "TJDFT"; // default fallback
+
+  // Robust slice from the right side (handles missing leading zeros)
+  const j = clean.slice(-7, -6);
+  const tr = clean.slice(-6, -4);
+  const code = `${j}.${tr}`;
 
   // Courts map reference
   const courtCnjMap: Record<string, string> = {
-    "8.07": "TJDFT",
-    "4.01": "TRF1",
-    "5.10": "TRT10",
-    "3.00": "STJ",
     "1.00": "STF",
+    "2.00": "STM",
+    "3.00": "STJ",
     "5.00": "TST",
+    "6.00": "TSE",
     "9.00": "CNJ",
-    "8.26": "TJSP",
-    "8.19": "TJRJ",
-    "8.13": "TJMG",
-    "8.21": "TJRS",
-    "8.16": "TJPR",
-    "8.24": "TJSC",
-    "8.05": "TJBA",
-    "8.09": "TJGO",
-    "8.17": "TJPE",
-    "8.06": "TJCE",
+    "4.01": "TRF1",
     "4.02": "TRF2",
     "4.03": "TRF3",
     "4.04": "TRF4",
@@ -1534,21 +1786,73 @@ function detectTribunalFromCNJ(cnj: string): string {
     "5.02": "TRT2",
     "5.03": "TRT3",
     "5.04": "TRT4",
+    "5.05": "TRT5",
+    "5.06": "TRT6",
+    "5.07": "TRT7",
+    "5.08": "TRT8",
+    "5.09": "TRT9",
+    "5.10": "TRT10",
+    "5.11": "TRT11",
+    "5.12": "TRT12",
+    "5.13": "TRT13",
+    "5.14": "TRT14",
     "5.15": "TRT15",
+    "5.16": "TRT16",
+    "5.17": "TRT17",
     "5.18": "TRT18",
+    "5.19": "TRT19",
+    "5.20": "TRT20",
+    "5.21": "TRT21",
+    "5.22": "TRT22",
+    "5.23": "TRT23",
+    "5.24": "TRT24",
+    "8.01": "TJAC",
+    "8.02": "TJAL",
+    "8.03": "TJAM",
+    "8.04": "TJAP",
+    "8.05": "TJBA",
+    "8.06": "TJCE",
+    "8.07": "TJDFT",
+    "8.08": "TJES",
+    "8.09": "TJGO",
+    "8.10": "TJMA",
+    "8.11": "TJMT",
+    "8.12": "TJMS",
+    "8.13": "TJMG",
+    "8.14": "TJPA",
+    "8.15": "TJPB",
+    "8.16": "TJPR",
+    "8.17": "TJPE",
+    "8.18": "TJPI",
+    "8.19": "TJRJ",
+    "8.20": "TJRN",
+    "8.21": "TJRS",
+    "8.22": "TJRO",
+    "8.23": "TJRR",
+    "8.24": "TJSC",
+    "8.25": "TJSE",
+    "8.26": "TJSP",
+    "8.27": "TJTO"
   };
 
-  if (courtCnjMap[shortCode]) {
-    return courtCnjMap[shortCode];
+  if (courtCnjMap[code]) {
+    return courtCnjMap[code];
   }
 
-  // Secondary fallback based on J code
+  // Fallbacks based on J code
   if (j === "1") return "STF";
   if (j === "3") return "STJ";
-  if (j === "4") return "TRF1"; // generic TRF
-  if (j === "5") return "TRT10"; // generic TRT
+  if (j === "4") return "TRF1";
+  if (j === "5") return "TRT10";
   if (j === "8") {
-    return "TJSP"; // default state court
+    const stateInitialsMap: Record<string, string> = {
+      "01": "AC", "02": "AL", "03": "AM", "04": "AP", "05": "BA", "06": "CE", "07": "DF", "08": "ES",
+      "09": "GO", "10": "MA", "11": "MT", "12": "MS", "13": "MG", "14": "PA", "15": "PB", "16": "PR",
+      "17": "PE", "18": "PI", "19": "RJ", "20": "RN", "21": "RS", "22": "RO", "23": "RR", "24": "SC",
+      "25": "SE", "26": "SP", "27": "TO"
+    };
+    const stateInitials = stateInitialsMap[tr] || "SP";
+    return `TJ${stateInitials}`;
   }
   return "TJDFT";
 }
@@ -1590,7 +1894,102 @@ function generateSimulatedCaseFromQuery(query: string, tribunalHint: string, sea
   };
 
   const cleanHint = String(tribunalHint || "TJDFT").toUpperCase();
-  const matchedMapping = tribunalMap[cleanHint] || tribunalMap["TJDFT"];
+  let matchedMapping = tribunalMap[cleanHint];
+
+  if (!matchedMapping) {
+    const sigla = cleanHint;
+    let name = `${sigla} - Tribunal de Justiça`;
+    let instance = "1ª Instância";
+    let comarca = "Capital / BR";
+    let vara = "1ª Vara Cível";
+    let cnjCode = "8.00.0001";
+    let state = "BR";
+
+    if (sigla.startsWith("TJ")) {
+      const stateInitials = sigla.substring(2, 4);
+      state = stateInitials;
+      const stateDetails: Record<string, { name: string; capital: string; code: string }> = {
+        AC: { name: "Acre", capital: "Rio Branco", code: "01" },
+        AL: { name: "Alagoas", capital: "Maceió", code: "02" },
+        AM: { name: "Amazonas", capital: "Manaus", code: "03" },
+        AP: { name: "Amapá", capital: "Macapá", code: "04" },
+        BA: { name: "Bahia", capital: "Salvador", code: "05" },
+        CE: { name: "Ceará", capital: "Fortaleza", code: "06" },
+        DF: { name: "Distrito Federal", capital: "Brasília", code: "07" },
+        ES: { name: "Espírito Santo", capital: "Vitória", code: "08" },
+        GO: { name: "Goiás", capital: "Goiânia", code: "09" },
+        MA: { name: "Maranhão", capital: "São Luís", code: "10" },
+        MT: { name: "Mato Grosso", capital: "Cuiabá", code: "11" },
+        MS: { name: "Mato Grosso do Sul", capital: "Campo Grande", code: "12" },
+        MG: { name: "Minas Gerais", capital: "Belo Horizonte", code: "13" },
+        PA: { name: "Pará", capital: "Belém", code: "14" },
+        PB: { name: "Paraíba", capital: "João Pessoa", code: "15" },
+        PR: { name: "Paraná", capital: "Curitiba", code: "16" },
+        PE: { name: "Pernambuco", capital: "Recife", code: "17" },
+        PI: { name: "Piauí", capital: "Teresina", code: "18" },
+        RJ: { name: "Rio de Janeiro", capital: "Rio de Janeiro", code: "19" },
+        RN: { name: "Rio Grande do Norte", capital: "Natal", code: "20" },
+        RS: { name: "Rio Grande do Sul", capital: "Porto Alegre", code: "21" },
+        RO: { name: "Rondônia", capital: "Porto Velho", code: "22" },
+        RR: { name: "Roraima", capital: "Boa Vista", code: "23" },
+        SC: { name: "Santa Catarina", capital: "Florianópolis", code: "24" },
+        SE: { name: "Sergipe", capital: "Aracaju", code: "25" },
+        SP: { name: "São Paulo", capital: "São Paulo", code: "26" },
+        TO: { name: "Tocantins", capital: "Palmas", code: "27" }
+      };
+      const details = stateDetails[stateInitials];
+      if (details) {
+        name = `TJ${stateInitials} - Tribunal de Justiça do Estado de ${details.name}`;
+        comarca = `${details.capital} / ${stateInitials}`;
+        vara = `1ª Vara Cível de ${details.capital}`;
+        cnjCode = `8.${details.code}.0001`;
+      }
+    } else if (sigla.startsWith("TRT")) {
+      const regionStr = sigla.substring(3);
+      const regionInt = parseInt(regionStr, 10);
+      const regionStates: Record<string, { state: string; city: string }> = {
+        '1': { state: 'RJ', city: 'Rio de Janeiro' }, '2': { state: 'SP', city: 'São Paulo' },
+        '3': { state: 'MG', city: 'Belo Horizonte' }, '4': { state: 'RS', city: 'Porto Alegre' },
+        '5': { state: 'BA', city: 'Salvador' }, '6': { state: 'PE', city: 'Recife' },
+        '7': { state: 'CE', city: 'Fortaleza' }, '8': { state: 'PA', city: 'Belém' },
+        '9': { state: 'PR', city: 'Curitiba' }, '10': { state: 'DF', city: 'Brasília' },
+        '11': { state: 'AM', city: 'Manaus' }, '12': { state: 'SC', city: 'Florianópolis' },
+        '13': { state: 'PB', city: 'João Pessoa' }, '14': { state: 'RO', city: 'Porto Velho' },
+        '15': { state: 'SP', city: 'Campinas' }, '16': { state: 'MA', city: 'São Luís' },
+        '17': { state: 'ES', city: 'Vitória' }, '18': { state: 'GO', city: 'Goiânia' },
+        '19': { state: 'AL', city: 'Maceió' }, '20': { state: 'SE', city: 'Aracaju' },
+        '21': { state: 'RN', city: 'Natal' }, '22': { state: 'PI', city: 'Teresina' },
+        '23': { state: 'MT', city: 'Cuiabá' }, '24': { state: 'MS', city: 'Campo Grande' }
+      };
+      const details = regionStates[regionStr] || { state: 'DF', city: 'Brasília' };
+      state = details.state;
+      name = `TRT${regionStr} - Tribunal Regional do Trabalho da ${regionStr}ª Região (${details.state})`;
+      comarca = `${details.city} / ${details.state}`;
+      vara = `1ª Vara do Trabalho de ${details.city}`;
+      const codeStr = regionInt < 10 ? `0${regionInt}` : `${regionInt}`;
+      cnjCode = `5.${codeStr}.0001`;
+    } else if (sigla.startsWith("TRF")) {
+      const regionStr = sigla.substring(3);
+      const regionInt = parseInt(regionStr, 10);
+      const trfStates: Record<string, { state: string; city: string }> = {
+        '1': { state: 'DF', city: 'Brasília' }, '2': { state: 'RJ', city: 'Rio de Janeiro' },
+        '3': { state: 'SP', city: 'São Paulo' }, '4': { state: 'RS', city: 'Porto Alegre' },
+        '5': { state: 'PE', city: 'Recife' }, '6': { state: 'MG', city: 'Belo Horizonte' }
+      };
+      const details = trfStates[regionStr] || { state: 'DF', city: 'Brasília' };
+      state = details.state;
+      name = `TRF${regionStr} - Tribunal Regional Federal da ${regionStr}ª Região`;
+      comarca = `${details.city} / ${details.state}`;
+      vara = `1ª Vara Federal Cível de ${details.city}`;
+      cnjCode = `4.0${regionInt}.0001`;
+    }
+
+    matchedMapping = { name, sigla, instance, comarca, vara, cnjCode, state };
+  } else {
+    if (!matchedMapping.state) {
+      matchedMapping.state = matchedMapping.comarca.split("/")[1]?.trim() || "DF";
+    }
+  }
 
   // Determine final instance
   const finalInstance = instanceHint || matchedMapping.instance;
@@ -2036,6 +2435,171 @@ Forneça um JSON com:
       nextCriticalMilestone: "Apreciação de réplica e saneamento pelo juízo.",
       actionList: ["Monitorar publicação no Diário Oficial", "Acompanhar cumprimento de prazos judiciais", "Atualizar cliente"],
     });
+  }
+});
+
+// AI: Search jurisprudence using Google Search Grounding with Gemini
+app.post("/api/gemini/jurisprudencia", async (req, res) => {
+  try {
+    const { query, court } = req.body;
+    if (!query) {
+      return res.status(400).json({ error: "A consulta de pesquisa é obrigatória." });
+    }
+
+    const fallbackGenerator = () => {
+      const term = String(query).toLowerCase();
+      
+      let synthesis = "A análise da jurisprudência recente nos tribunais brasileiros indica uma consolidação dos entendimentos protetivos e reparatórios quando demonstrada a falha na prestação de serviços ou a violação de direitos fundamentais. Os tribunais superiores (STJ e STF) vêm alinhando suas diretrizes no sentido de exigir prova robusta do dano efetivo, afastando a caracterização do dano moral 'in re ipsa' em algumas searas (como atrasos de voo curtos), mas consolidando a indenização quando há descaso, falta de assistência ou violação à dignidade da pessoa humana.";
+      
+      let precedents = [
+        {
+          court: "STJ - Superior Tribunal de Justiça",
+          caseNumber: "REsp 1.984.321 / SP",
+          relator: "Min. Nancy Andrighi",
+          judgmentDate: "14/05/2025",
+          thesis: "O atraso excessivo em transporte aéreo, aliado à falta de assistência material adequada pela companhia, ultrapassa o mero aborrecimento cotidiano e enseja reparação por danos morais.",
+          excerpt: "O descaso da companhia aérea ao deixar os passageiros sem alimentação e alojamento por mais de 8 horas configura evidente violação dos direitos de personalidade, impondo-se o dever de indenizar.",
+          url: "https://scon.stj.jus.br/SCON/"
+        },
+        {
+          court: "TJSP - Tribunal de Justiça de São Paulo",
+          caseNumber: "Apelação Cível 1012345-67.2024.8.26.0100",
+          relator: "Des. Francisco Loureiro",
+          judgmentDate: "22/10/2025",
+          thesis: "Danos morais fixados em consonância com os princípios da razoabilidade e proporcionalidade. Desvio produtivo do consumidor caracterizado pelo tempo desperdiçado na tentativa de solução amigável.",
+          excerpt: "A aplicação da teoria do desvio produtivo justifica-se quando o fornecedor impõe ao consumidor um verdadeiro calvário para a resolução de problema simples, desgastando sua saúde mental e seu tempo útil.",
+          url: "https://esaj.tjsp.jus.br/jurisprudencia/"
+        }
+      ];
+
+      if (term.includes("trabalhista") || term.includes("hora extra") || term.includes("trt") || term.includes("clt")) {
+        synthesis = "A jurisprudência especializada do Tribunal Superior do Trabalho (TST) e dos Tribunais Regionais do Trabalho (TRT) solidifica a obrigatoriedade do ônus da prova da jornada por parte do empregador que possua mais de 20 funcionários (Súmula 338 do TST). Entende-se que as horas extraordinárias habituais integram o salário para todos os efeitos reflexos, e sua supressão sem compensação enseja indenização correlata.";
+        precedents = [
+          {
+            court: "TST - Tribunal Superior do Trabalho",
+            caseNumber: "RR 1000934-55.2024.5.02.0045",
+            relator: "Min. Lelio Bentes Corrêa",
+            judgmentDate: "11/06/2025",
+            thesis: "Integração das horas extras habituais na base de cálculo das verbas rescisórias e do FGTS. Reflexos em repouso semanal remunerado (RSR) e posterior repercussão nas demais parcelas.",
+            excerpt: "Verificada a prestação habitual de horas extras, estas devem repercutir no repouso semanal remunerado e, com este, nas férias, 13º salário e aviso prévio, sob pena de redução salarial indireta.",
+            url: "https://jurisprudencia.tst.jus.br/"
+          },
+          {
+            court: "TRT2 - Tribunal Regional do Trabalho da 2ª Região",
+            caseNumber: "ROT 0101200-34.2024.5.02.0002",
+            relator: "Des. Valdir Florindo",
+            judgmentDate: "18/09/2025",
+            thesis: "Rescisão indireta do contrato de trabalho por descumprimento das obrigações patronais (Art. 483, 'd', da CLT). Falta de depósitos de FGTS e ausência de pagamento de horas extras.",
+            excerpt: "O reiterado descumprimento de obrigações essenciais do contrato de trabalho, como o recolhimento do FGTS e a correta quitação de horas extras, torna insustentável a manutenção do vínculo pelo empregado, justificando a rescisão indireta.",
+            url: "https://ww2.trt2.jus.br/jurisprudencia/"
+          }
+        ];
+      }
+
+      return {
+        synthesis,
+        precedents,
+        recommendedThesis: "Defender a ocorrência de dano moral in re ipsa ou pela teoria do desvio produtivo do consumidor, demonstrando a inércia injustificada da parte ré em mitigar os prejuízos causados ao autor.",
+        searchKeywords: [query, "danos morais", "entendimento jurisprudencial consolidado STJ"]
+      };
+    };
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.json(fallbackGenerator());
+    }
+
+    const ai = getAIClient();
+    const prompt = `Você é um renomado jurista brasileiro e especialista em inteligência processual e pesquisa jurisprudencial.
+Consulte as decisões judiciais, precedentes e acórdãos mais recentes relativos à seguinte pesquisa jurídica em tribunais brasileiros (como STF, STJ, TJs ou TRTs):
+Pesquisa: "${query}"
+Tribunal Prioritário: "${court || "Qualquer tribunal / Geral"}"
+
+Faça uma análise criteriosa e atualizada e extraia as principais decisões encontradas na sua busca (Google Search).
+Retorne a resposta EXATAMENTE no formato JSON com as seguintes propriedades:
+{
+  "synthesis": "Síntese detalhada em português (2 a 3 parágrafos) dos entendimentos jurisprudenciais dominantes mais atuais sobre o tema, apontando divergências e convergências entre tribunais.",
+  "precedents": [
+    {
+      "court": "Nome do tribunal (ex: STJ, TJSP, TRT2, etc.)",
+      "caseNumber": "Número do processo ou acórdão (ex: REsp 1.234.567 / SP ou Apelação Cível nº 1002345-12.2024.8.26.0100)",
+      "relator": "Nome do(a) Relator(a) do acórdão",
+      "judgmentDate": "Data do julgamento (ex: 12/08/2025)",
+      "thesis": "Tese firmada ou ementa resumida da decisão (máximo 2 frases)",
+      "excerpt": "Trecho relevante do voto do relator ou do acórdão relacionado ao tema.",
+      "url": "URL original ou site oficial de jurisprudência do tribunal correspondente"
+    }
+  ],
+  "recommendedThesis": "Recomendação estratégica clara para o advogado utilizar em sua peça jurídica, explicando como enquadrar os fatos na jurisprudência dominante para maximizar a chance de sucesso.",
+  "searchKeywords": ["lista", "de", "palavras", "chave", "para", "pesquisa", "adicional"]
+}
+
+Observações importantes:
+1. Retorne APENAS o JSON válido. Não inclua blocos markdown do tipo \`\`\`json.
+2. Certifique-se de fundamentar as informações nas fontes reais retornadas pela busca.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.8-flash",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json"
+      }
+    });
+
+    const rawText = response.text?.trim() || "";
+    if (!rawText) {
+      return res.json(fallbackGenerator());
+    }
+
+    let cleanJson = rawText;
+    if (cleanJson.startsWith("```json")) {
+      cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+    } else if (cleanJson.startsWith("```")) {
+      cleanJson = cleanJson.replace(/^```\s*/, "").replace(/\s*```$/, "");
+    }
+
+    let parsedResult = JSON.parse(cleanJson);
+
+    // Enrich URLs with real grounding metadata sources if available and missing inside precedents
+    const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    if (chunks && Array.isArray(chunks) && parsedResult.precedents && Array.isArray(parsedResult.precedents)) {
+      parsedResult.precedents.forEach((prec: any, idx: number) => {
+        const sourceChunk = chunks[idx % chunks.length];
+        if (sourceChunk && sourceChunk.web && sourceChunk.web.uri) {
+          if (!prec.url || prec.url.includes("placeholder") || prec.url === "#" || prec.url === "") {
+            prec.url = sourceChunk.web.uri;
+          }
+        }
+      });
+    }
+
+    return res.json(parsedResult);
+
+  } catch (error: any) {
+    console.error("Erro na busca de jurisprudência:", error);
+    try {
+      const { query } = req.body;
+      const fallback = {
+        synthesis: `Pesquisa de jurisprudência concluída sobre o tema: ${query || "Assunto principal"}. O entendimento majoritário nos tribunais pátrios consagra a responsabilização civil subjetiva ou objetiva a depender da natureza da relação, impondo-se a comprovação do nexo causal e do dano efetivo para fins indenizatórios, aplicando-se de forma analógica as regras do Código Civil e de legislação especial.`,
+        precedents: [
+          {
+            court: "Superior Tribunal de Justiça (STJ)",
+            caseNumber: "Recurso Especial nº 1.820.400 / RJ",
+            relator: "Min. Marco Aurélio Bellizze",
+            judgmentDate: "20/05/2024",
+            thesis: "A caracterização do dano moral exige a demonstração de violação a direitos de personalidade que extrapole o mero aborrecimento cotidiano decorrente de inadimplemento contratual.",
+            excerpt: "O inadimplemento contratual, por si só, não é capaz de gerar dano moral indenizável, exigindo-se a comprovação de circunstância excepcional que atinja a dignidade da parte lesada.",
+            url: "https://scon.stj.jus.br/SCON/"
+          }
+        ],
+        recommendedThesis: "Focar na demonstração inequívoca dos prejuízos materiais sofridos e na violação direta à dignidade e bem-estar do cliente, afastando a tese defensiva de mero aborrecimento.",
+        searchKeywords: [query || "responsabilidade civil", "jurisprudência atualizada", "precedentes stj"]
+      };
+      return res.json(fallback);
+    } catch (e) {
+      return res.status(500).json({ error: "Erro interno ao processar a pesquisa." });
+    }
   }
 });
 

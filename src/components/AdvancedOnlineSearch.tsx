@@ -58,8 +58,8 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
   const [cnjDig, setCnjDig] = useState(''); // 2 digits
   const [cnjAno, setCnjAno] = useState(''); // 4 digits
   const [cnjJus, setCnjJus] = useState('8'); // 1 digit (8 = Justiça Estadual por padrão)
-  const [cnjTrib, setCnjTrib] = useState('07'); // 2 digits (07 = TJDFT por padrão)
-  const [cnjOrg, setCnjOrg] = useState('0001'); // 4 digits (0001 = Brasília por padrão)
+  const [cnjTrib, setCnjTrib] = useState('09'); // 2 digits (09 = TJGO por padrão)
+  const [cnjOrg, setCnjOrg] = useState('0051'); // 4 digits (0051 = Goiânia por padrão)
 
   const [useSplitCNJ, setUseSplitCNJ] = useState(true);
   const [cnjUnified, setCnjUnified] = useState('');
@@ -69,7 +69,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
   const [partyPolo, setPartyPolo] = useState<'todos' | 'active' | 'passive'>('todos');
   const [lawyerQuery, setLawyerQuery] = useState('');
   const [lawyerOabNumber, setLawyerOabNumber] = useState('');
-  const [lawyerOabState, setLawyerOabState] = useState('DF');
+  const [lawyerOabState, setLawyerOabState] = useState('GO');
   
   // Court details
   const [selectedTribunal, setSelectedTribunal] = useState('TODOS');
@@ -191,8 +191,8 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
     setCnjDig('');
     setCnjAno('');
     setCnjJus('8');
-    setCnjTrib('07');
-    setCnjOrg('0001');
+    setCnjTrib('09');
+    setCnjOrg('0051');
     setCnjUnified('');
     setPartyQuery('');
     setLawyerQuery('');
@@ -812,6 +812,22 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                   className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-[#003366] font-bold rounded cursor-pointer"
                 >
                   TRT10: 0000412-90.2024
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoadPreset('1002345-67.2024.8.26.0100')}
+                  className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold rounded cursor-pointer"
+                  title="Simular busca no TJSP (São Paulo)"
+                >
+                  TJSP: 1002345-67.2024
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLoadPreset('1000512-34.2024.5.02.0002')}
+                  className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-900 font-bold rounded cursor-pointer"
+                  title="Simular busca no TRT2 (São Paulo Trabalhista)"
+                >
+                  TRT2: 1000512-34.2024
                 </button>
                 <button
                   type="button"

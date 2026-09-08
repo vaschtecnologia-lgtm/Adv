@@ -43,6 +43,7 @@ interface DocumentsViewProps {
   office: LawOfficeSettings;
   onAddDocument: (doc: LegalDocumentItem) => void;
   onDeleteDocument: (id: string) => void;
+  activeUser?: any;
 }
 
 export const DocumentsView: React.FC<DocumentsViewProps> = ({
@@ -52,6 +53,7 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   office,
   onAddDocument,
   onDeleteDocument,
+  activeUser,
 }) => {
   const fallbackClient: Client = {
     id: '',
@@ -290,6 +292,17 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         </div>
       )}
 
+      {/* Warning Banner for Read-Only Mode */}
+      {activeUser?.privilege === 'leitura' && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl p-4 text-xs flex items-center gap-3">
+          <span className="text-base">⚠️</span>
+          <span>
+            <strong>Modo de Leitura Ativo:</strong> Seu operador atual (<strong>{activeUser?.name}</strong>) possui privilégio de acesso restrito (<em>Leitura</em>). 
+            Você pode pesquisar e baixar documentos cadastrados, mas gerar novas minutas e contratos está bloqueado.
+          </span>
+        </div>
+      )}
+
       {/* Header & Quick Action */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -323,7 +336,12 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
           <button
             onClick={() => setIsGeneratorModalOpen(true)}
-            className="px-4 sm:px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20 whitespace-nowrap"
+            disabled={activeUser?.privilege === 'leitura'}
+            className={`px-4 sm:px-5 py-2.5 font-extrabold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap ${
+              activeUser?.privilege === 'leitura'
+                ? 'bg-slate-850 text-slate-500 border border-slate-800 cursor-not-allowed'
+                : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 cursor-pointer shadow-lg shadow-amber-500/20'
+            }`}
           >
             <Plus className="w-4 h-4" />
             Gerar Novo Documento

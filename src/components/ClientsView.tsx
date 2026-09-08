@@ -34,6 +34,7 @@ interface ClientsViewProps {
   onDeleteClient: (id: string) => void;
   onOpenDocumentGeneratorForClient: (clientId: string) => void;
   onSelectProcess: (processId: string) => void;
+  activeUser?: any;
 }
 
 export const ClientsView: React.FC<ClientsViewProps> = ({
@@ -45,6 +46,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
   onDeleteClient,
   onOpenDocumentGeneratorForClient,
   onSelectProcess,
+  activeUser,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(clients[0]?.id || null);
@@ -309,6 +311,17 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Warning Banner for Read-Only Mode */}
+      {activeUser?.privilege === 'leitura' && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl p-4 text-xs flex items-center gap-3">
+          <span className="text-base">⚠️</span>
+          <span>
+            <strong>Modo de Leitura Ativo:</strong> Seu operador atual (<strong>{activeUser?.name}</strong>) possui privilégio de acesso restrito (<em>Leitura</em>). 
+            Ações de cadastro, alteração e exclusão estão temporariamente bloqueadas neste painel.
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -323,7 +336,12 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
         <button
           onClick={handleOpenNewClientModal}
-          className="px-4 sm:px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20 whitespace-nowrap self-stretch sm:self-auto"
+          disabled={activeUser?.privilege === 'leitura'}
+          className={`px-4 sm:px-5 py-2.5 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap self-stretch sm:self-auto ${
+            activeUser?.privilege === 'leitura'
+              ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+              : 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer shadow-lg shadow-amber-500/20'
+          }`}
         >
           <Plus className="w-4 h-4" />
           Cadastrar Novo Cliente
@@ -417,17 +435,27 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => handleOpenEditClientModal(selectedClient)}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
-                    title="Editar dados cadastrais"
+                    disabled={activeUser?.privilege === 'leitura'}
+                    className={`px-3 py-1.5 border rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                      activeUser?.privilege === 'leitura'
+                        ? 'bg-slate-850 text-slate-500 border-slate-800 cursor-not-allowed'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer'
+                    }`}
+                    title={activeUser?.privilege === 'leitura' ? 'Edição bloqueada' : 'Editar dados cadastrais'}
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                    <Edit3 className={`w-3.5 h-3.5 ${activeUser?.privilege === 'leitura' ? 'text-slate-600' : 'text-amber-400'}`} />
                     Editar
                   </button>
 
                   <button
                     onClick={() => setDeleteConfirmModal({ isOpen: true, client: selectedClient })}
-                    className="px-3 py-1.5 bg-red-950/30 hover:bg-red-900/50 text-red-400 border border-red-800/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition"
-                    title="Excluir cliente"
+                    disabled={activeUser?.privilege === 'leitura'}
+                    className={`px-3 py-1.5 border rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                      activeUser?.privilege === 'leitura'
+                        ? 'bg-slate-850 text-slate-500 border-slate-800 cursor-not-allowed'
+                        : 'bg-red-950/30 hover:bg-red-900/50 text-red-400 border-red-800/40 cursor-pointer'
+                    }`}
+                    title={activeUser?.privilege === 'leitura' ? 'Exclusão bloqueada' : 'Excluir cliente'}
                   >
                     Excluir
                   </button>
@@ -443,7 +471,13 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                   )}
                   <button
                     onClick={() => onOpenDocumentGeneratorForClient(selectedClient.id)}
-                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition shadow"
+                    disabled={activeUser?.privilege === 'leitura'}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
+                      activeUser?.privilege === 'leitura'
+                        ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        : 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer shadow'
+                    }`}
+                    title={activeUser?.privilege === 'leitura' ? 'Geração de documentos bloqueada' : 'Gerar minutas'}
                   >
                     <FileText className="w-3.5 h-3.5" />
                     Gerador de Minutas

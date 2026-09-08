@@ -32,6 +32,7 @@ interface DeadlinesViewProps {
   onSimulateUrgentDeadline?: () => void;
   notificationPermission?: NotificationPermission;
   onRequestNotificationPermission?: () => void;
+  activeUser?: any;
 }
 
 export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
@@ -46,6 +47,7 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
   onSimulateUrgentDeadline,
   notificationPermission = 'default',
   onRequestNotificationPermission,
+  activeUser,
 }) => {
   const [filterStatus, setFilterStatus] = useState<string>('pendentes');
   const [searchQuery, setSearchQuery] = useState('');
@@ -283,6 +285,17 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Warning Banner for Read-Only Mode */}
+      {activeUser?.privilege === 'leitura' && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl p-4 text-xs flex items-center gap-3">
+          <span className="text-base">⚠️</span>
+          <span>
+            <strong>Modo de Leitura Ativo:</strong> Seu operador atual (<strong>{activeUser?.name}</strong>) possui privilégio de acesso restrito (<em>Leitura</em>). 
+            Você pode consultar e monitorar prazos, mas agendar ou alterar datas está bloqueado.
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -303,8 +316,13 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
           {onSimulateUrgentDeadline && (
             <button
               onClick={onSimulateUrgentDeadline}
-              className="px-3.5 sm:px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-sm whitespace-nowrap"
-              title="Cria um prazo vencendo amanhã para disparar o alerta visual e log do sistema"
+              disabled={activeUser?.privilege === 'leitura'}
+              className={`px-3.5 sm:px-4 py-2.5 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap border ${
+                activeUser?.privilege === 'leitura'
+                  ? 'bg-slate-850 border-slate-800 text-slate-500 cursor-not-allowed'
+                  : 'bg-slate-800 hover:bg-slate-700 text-amber-400 border-amber-500/30 cursor-pointer shadow-sm'
+              }`}
+              title={activeUser?.privilege === 'leitura' ? 'Simulação indisponível' : 'Cria um prazo de 24h para teste'}
             >
               <Clock className="w-4 h-4 text-amber-400" />
               Simular Prazo 24h
@@ -313,7 +331,12 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
 
           <button
             onClick={handleOpenNewModal}
-            className="px-4 sm:px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20 whitespace-nowrap"
+            disabled={activeUser?.privilege === 'leitura'}
+            className={`px-4 sm:px-5 py-2.5 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 whitespace-nowrap ${
+              activeUser?.privilege === 'leitura'
+                ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer shadow-lg shadow-amber-500/20'
+            }`}
           >
             <Plus className="w-4 h-4" />
             Agendar Novo Prazo

@@ -984,6 +984,7 @@ export default function App() {
     if (Array.isArray(backupData.trashItems)) setTrashItems(backupData.trashItems);
 
     logAction('SYNC', 'CONFIG', 'Backup integral JSON restaurado no workspace WONO ADVOCACIA');
+    localStorage.setItem('wono_system_cleared', 'false');
   };
 
   // Global Sync Simulation with DataJud and Diários Oficiais
@@ -1444,6 +1445,7 @@ export default function App() {
             onAddTeamMember={handleAddTeamMember}
             deadlines={deadlines}
             onUpdateDeadline={handleUpdateDeadline}
+            activeUser={activeUser}
           />
         )}
 
@@ -1455,6 +1457,7 @@ export default function App() {
             office={office}
             onAddDocument={handleAddDocument}
             onDeleteDocument={handleDeleteDocument}
+            activeUser={activeUser}
           />
         )}
 
@@ -1474,6 +1477,7 @@ export default function App() {
             onSimulateUrgentDeadline={handleSimulateUrgentDeadline}
             notificationPermission={notificationPermission}
             onRequestNotificationPermission={handleRequestNotificationPermission}
+            activeUser={activeUser}
           />
         )}
 
@@ -1492,6 +1496,7 @@ export default function App() {
               setSelectedProcessId(id);
               setCurrentTab('andamentos');
             }}
+            activeUser={activeUser}
           />
         )}
 
@@ -1606,6 +1611,7 @@ export default function App() {
           financialCount: financialRecords.length,
         }}
         onDownloadBackup={handleExportFullBackupJson}
+        deletionPassword={deletionPassword}
       />
 
       {/* Secure Delete Confirmation Modal */}

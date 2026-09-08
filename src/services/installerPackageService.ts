@@ -768,12 +768,308 @@ export function generateNetlifyToml(): string {
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  NODE_VERSION = "20"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
 `;
 }
+
+/**
+ * Netlify SPA Redirects File: `_redirects`
+ */
+export function generateNetlifyRedirects(): string {
+  return `/*    /index.html   200
+`;
+}
+
+/**
+ * Netlify Automated CLI Deploy Script for Windows (`deploy_netlify.bat`)
+ */
+export function generateNetlifyDeployBat(): string {
+  return `@echo off
+chcp 65001 >nul
+title WONO ADVOCACIA - Publicador Automático Netlify
+color 0A
+
+echo ==============================================================================
+echo            WONO ADVOCACIA - PUBLICADOR AUTOMÁTICO PARA O NETLIFY
+echo ==============================================================================
+echo.
+echo Este script compilará o sistema Wono Advocacia e fará a publicação
+echo diretamente na sua conta do Netlify com SSL gratuito e domínio global.
+echo.
+
+:: 1. Verificar se Node.js e npm estão disponíveis
+echo [1/4] Verificando ambiente Node.js...
+where node >nul 2>nul
+if %errorlevel% neq 0 (
+    color 0C
+    echo [ERRO] Node.js não foi encontrado neste computador!
+    echo Baixe e instale a versão LTS gratuita em: https://nodejs.org/
+    echo.
+    pause
+    exit /b 1
+)
+echo [OK] Node.js detectado com sucesso.
+echo.
+
+:: 2. Instalar dependências se a pasta node_modules não existir
+if not exist "node_modules" (
+    echo [2/4] Instalando dependências do projeto (npm install)...
+    call npm install
+    if %errorlevel% neq 0 (
+        color 0C
+        echo [ERRO] Falha ao instalar dependências.
+        pause
+        exit /b 1
+    )
+) else (
+    echo [2/4] Dependências node_modules já instaladas.
+)
+echo.
+
+:: 3. Compilar a aplicação para produção
+echo [3/4] Compilando aplicação Wono Advocacia para produção (npm run build)...
+call npm run build
+if %errorlevel% neq 0 (
+    color 0C
+    echo [ERRO] Falha durante o build da aplicação.
+    pause
+    exit /b 1
+)
+echo [OK] Pasta 'dist' gerada com sucesso com todos os arquivos estáticos!
+echo.
+
+:: 4. Publicar no Netlify via Netlify CLI
+echo [4/4] Conectando ao Netlify e publicando em produção...
+echo.
+echo Caso seja a primeira vez, o Netlify abrirá uma janela do navegador para login.
+echo.
+call npx --yes netlify-cli deploy --prod --dir=dist
+
+if %errorlevel% equ 0 (
+    color 0A
+    echo.
+    echo ==============================================================================
+    echo  [SUCESSO] Seu sistema Wono Advocacia está 100%% ONLINE NO NETLIFY!
+    echo ==============================================================================
+    echo  Copie a URL fornecida acima pelo Netlify e abra no navegador ou celular.
+    echo  Dica: Acesse as configurações no Netlify para vincular seu domínio próprio.
+    echo ==============================================================================
+) else (
+    color 0E
+    echo.
+    echo [DICA ALTERNATIVA] Se preferir não usar linha de comando:
+    echo 1. Acesse https://app.netlify.com/drop
+    echo 2. Arraste a pasta 'dist' gerada dentro do navegador!
+    echo.
+)
+
+pause
+`;
+}
+
+/**
+ * Netlify Automated CLI Deploy Script for Linux & macOS (`deploy_netlify.sh`)
+ */
+export function generateNetlifyDeploySh(): string {
+  return `#!/usr/bin/env bash
+# ==============================================================================
+#           WONO ADVOCACIA - SCRIPT DE DEPLOY PARA NETLIFY (LINUX / MACOS)
+# ==============================================================================
+
+set -e
+
+echo "=== Wono Advocacia: Publicador Netlify ==="
+echo ""
+
+if ! command -v node &> /dev/null; then
+    echo "[ERRO] Node.js não está instalado. Instale o Node.js em: https://nodejs.org"
+    exit 1
+fi
+
+echo "[1/3] Verificando dependências..."
+if [ ! -d "node_modules" ]; then
+    npm install
+fi
+
+echo "[2/3] Compilando para produção (npm run build)..."
+npm run build
+
+echo "[3/3] Publicando no Netlify em produção..."
+npx --yes netlify-cli deploy --prod --dir=dist
+
+echo ""
+echo "=== Publicação concluída com sucesso no Netlify! ==="
+`;
+}
+
+/**
+ * Netlify Drop 1-Click Builder & Explorer Opener for Windows (`preparar_netlify_drop.bat`)
+ */
+export function generateNetlifyDropBat(): string {
+  return `@echo off
+chcp 65001 >nul
+title WONO ADVOCACIA - Preparar Pacote para Netlify Drop
+color 0B
+
+echo ==============================================================================
+echo       WONO ADVOCACIA - PREPARADOR PARA O NETLIFY DROP (30 SEGUNDOS)
+echo ==============================================================================
+echo.
+echo Este script vai:
+echo 1. Compilar os arquivos mais recentes do seu escritório (npm run build)
+echo 2. Abrir a página oficial do Netlify Drop no seu navegador
+echo 3. Abrir a pasta 'dist' no Windows Explorer para você apenas arrastar!
+echo.
+pause
+
+echo [1/3] Compilando aplicação Wono Advocacia...
+call npm run build
+
+if %errorlevel% neq 0 (
+    color 0C
+    echo [ERRO] Ocorreu um problema ao compilar. Verifique se o Node.js está instalado.
+    pause
+    exit /b 1
+)
+
+echo.
+echo [2/3] Abrindo página do Netlify Drop no navegador...
+start "" "https://app.netlify.com/drop"
+
+echo.
+echo [3/3] Abrindo a pasta 'dist' no Windows Explorer...
+explorer "%CD%\\dist"
+
+color 0A
+echo.
+echo ==============================================================================
+echo [TUDO PRONTO!]
+echo Agora basta ARRASTAR a pasta 'dist' para dentro da tela do Netlify Drop!
+echo Em 15 segundos o seu sistema estará online com link HTTPS gratuito.
+echo ==============================================================================
+pause
+`;
+}
+
+/**
+ * Step-by-Step Netlify Deployment & Configuration Guide (`GUIA_INSTALADOR_NETLIFY.md`)
+ */
+export function generateNetlifyGuideMd(data: InstallerDataPayload): string {
+  const dateStr = new Date().toISOString().split('T')[0];
+  return `# GUIA COMPLETO: INSTALAÇÃO E PUBLICAÇÃO NO NETLIFY
+**Wono Advocacia • Sistema de Gestão Jurídica**
+*Data de geração: ${dateStr} • Escritório: ${data.office.officeName}*
+
+---
+
+## 🚀 INTRODUÇÃO
+O **Netlify** é uma das plataformas em nuvem mais rápidas, confiáveis e modernas do mundo para hospedar aplicações web.
+- **Custo:** R$ 0,00 (Plano Starter Gratuito com 100 GB de tráfego/mês e SSL vitalício).
+- **Sem Servidor para Manter:** Alta disponibilidade com CDN global em servidores edge.
+- **Acesso:** Funciona em qualquer computador, notebook, tablet e smartphone.
+
+---
+
+## 🎯 OPÇÃO 1: O MÉTODO MAIS RÁPIDO DO MUNDO — NETLIFY DROP (30 SEGUNDOS)
+Não quer instalar nada no terminal nem usar GitHub? Siga estes 4 passos:
+
+1. **Compilar a aplicação:**
+   - Dê um duplo clique no arquivo \`preparar_netlify_drop.bat\` (Windows) OU abra o terminal e digite:
+     \`\`\`bash
+     npm run build
+     \`\`\`
+   - Isso gerará a pasta \`dist/\` com todos os arquivos prontos.
+
+2. **Abrir o Netlify Drop:**
+   - Acesse no seu navegador: [https://app.netlify.com/drop](https://app.netlify.com/drop)
+   - Crie sua conta grátis (com Google, GitHub ou Email) caso ainda não tenha.
+
+3. **Arrastar a pasta \`dist\`:**
+   - Arraste a pasta \`dist\` gerada diretamente para o círculo indicado na tela do Netlify.
+
+4. **Pronto!**
+   - Seu site receberá uma URL pública instantânea com certificado de segurança HTTPS (ex: \`https://wono-advocacia.netlify.app\`).
+
+---
+
+## 🔄 OPÇÃO 2: MÉTODO RECOMENDADO — CONEXÃO COM GITHUB (CI/CD AUTOMÁTICO)
+Sempre que você alterar um arquivo ou atualizar o código no GitHub, o Netlify atualizará seu site automaticamente!
+
+1. Suba este projeto para um repositório seu no GitHub (pode ser público ou privado).
+2. Acesse [https://app.netlify.com](https://app.netlify.com) e clique em **"Add new site" > "Import an existing project"**.
+3. Escolha **GitHub** e autorize o acesso ao seu repositório.
+4. O Netlify detectará automaticamente o arquivo \`netlify.toml\` já configurado:
+   - **Build command:** \`npm run build\`
+   - **Publish directory:** \`dist\`
+   - **Node version:** \`20\`
+5. Clique em **"Deploy site"**. Em cerca de 1 minuto seu site estará no ar!
+
+---
+
+## ⚡ OPÇÃO 3: PUBLICAÇÃO DIRETA VIA TERMINAL (NETLIFY CLI)
+Se você gosta de praticidade via terminal:
+
+1. No Windows, dê um duplo clique no arquivo **\`deploy_netlify.bat\`**.
+   *(No Linux/macOS: execute \`bash deploy_netlify.sh\`)*.
+2. O script cuidará de tudo:
+   - Verifica o Node.js.
+   - Executa o build de produção.
+   - Faz login no Netlify e publica a pasta \`dist/\` com a flag \`--prod\`.
+
+---
+
+## 🌐 CONFIGURANDO SEU PRÓPRIO DOMÍNIO (Ex: \`www.meuescritorio.adv.br\`)
+1. No painel do Netlify, clique em **"Domain management" > "Add a domain"**.
+2. Digite seu domínio (ex: \`advocaciaexemplo.com.br\`).
+3. No seu registrador de domínio (Registro.br, GoDaddy, Hostgator, etc.):
+   - Crie uma entrada DNS do tipo **CNAME** para \`www\` apontando para o seu site do Netlify (\`seusite.netlify.app\`).
+   - Ou altere os DNS Nameservers para os servidores do Netlify.
+4. O Netlify emitirá automaticamente um **Certificado SSL Let's Encrypt Gratuito** em até 2 horas.
+
+---
+
+## ☁️ BANCO DE DADOS NA NUVEM GRATUITO (OPCIONAL)
+Como o Netlify hospeda a interface estática rápida (SPA):
+1. **Google Firebase Firestore Spark (Grátis vitalício):**
+   - Acesse o menu "Banco de Dados & Netlify" no Wono Advocacia.
+   - Cole as credenciais do seu projeto Firebase.
+2. **Supabase PostgreSQL (Grátis):**
+   - Crie um projeto grátis no Supabase.
+   - Abra o **SQL Editor** no Supabase e cole o conteúdo do arquivo \`schema_postgresql_supabase.sql\` que veio neste pacote.
+   - Suas tabelas de clientes, processos CNJ e prazos serão criadas instantaneamente!
+
+---
+
+## 📥 IMPORTANDO SEUS DADOS INICIAIS NO SITE DO NETLIFY
+Assim que abrir o site novo no Netlify:
+1. Vá até o menu **"Banco de Dados & Nuvem"** (ou "Escritório").
+2. Clique em **"Importar Backup JSON"**.
+3. Selecione o arquivo **\`backup_inicial_escritorio_${dateStr}.json\`** incluído neste pacote instalador.
+4. Todos os seus clientes (${data.clients.length}), processos judiciais (${data.processes.length}) e prazos (${data.deadlines.length}) estarão imediatamente disponíveis!
+
+*Wono Advocacia • Tecnologia Jurídica Descomplicada*
+`;
+}
+
 
 /**
  * Procfile for Railway, Heroku, Dokku & Cloud Container Runtimes
@@ -1029,6 +1325,103 @@ Leia o arquivo "GUIA_INSTALACAO_REDE_E_BANCO.md" para o manual passo a passo.
 }
 
 /**
+ * Compiles and triggers the download of the dedicated Netlify Deployment & Installer Package ZIP
+ */
+export async function downloadNetlifyInstallerPackageZip(data: InstallerDataPayload): Promise<void> {
+  const zip = new JSZip();
+  const dateStr = new Date().toISOString().split('T')[0];
+
+  // 1. Netlify Core Configuration Files
+  zip.file('netlify.toml', generateNetlifyToml());
+  zip.file('_redirects', generateNetlifyRedirects());
+  zip.file('.env.example', generateEnvExample());
+
+  // 2. Automated Scripts (Windows & Unix)
+  zip.file('deploy_netlify.bat', generateNetlifyDeployBat());
+  zip.file('deploy_netlify.sh', generateNetlifyDeploySh());
+  zip.file('preparar_netlify_drop.bat', generateNetlifyDropBat());
+
+  // 3. Documentation and Step-by-Step Manuals
+  zip.file('GUIA_INSTALADOR_NETLIFY.md', generateNetlifyGuideMd(data));
+  zip.file('LEIA-ME_PRIMEIROS_PASSOS_NETLIFY.txt', `==============================================================================
+         WONO ADVOCACIA - PACOTE INSTALADOR E PUBLICADOR PARA O NETLIFY
+==============================================================================
+
+Parabéns! Você baixou o instalador e publicador dedicado para o Netlify.
+
+COMO PUBLICAR EM 30 SEGUNDOS (NETLIFY DROP - SEM INSTALAÇÕES):
+1. No Windows, execute "preparar_netlify_drop.bat" (ou rode "npm run build" no terminal).
+2. O script compilará a pasta "dist" e abrirá o Netlify Drop no seu navegador.
+3. Arraste a pasta "dist" para a tela do Netlify Drop em: https://app.netlify.com/drop
+4. Seu sistema estará 100% online com certificado de segurança HTTPS gratuito!
+
+COMO PUBLICAR VIA GITHUB (CI/CD RECOMENDADO):
+1. Conecte seu repositório no Netlify (Add new site > Import from Git).
+2. O arquivo "netlify.toml" deste pacote já configura tudo automaticamente.
+3. A cada commit ou alteração, o Netlify atualiza seu sistema na nuvem!
+
+COMO PUBLICAR VIA LINHA DE COMANDO (NETLIFY CLI):
+- Windows: execute "deploy_netlify.bat"
+- Linux / Mac: execute "bash deploy_netlify.sh"
+
+BANCO DE DADOS NA NUVEM & IMPORTAÇÃO DE DADOS:
+- O arquivo "backup_inicial_escritorio_${dateStr}.json" contém todos os clientes,
+  processos e prazos atuais. Você pode importá-lo no menu "Escritório / Banco de Dados"
+  do seu novo site publicado no Netlify com apenas 1 clique!
+- Para banco em nuvem grátis, utilize Firebase Firestore Spark ou o script
+  "schema_postgresql_supabase.sql" no Supabase gratuito.
+
+Consulte o arquivo "GUIA_INSTALADOR_NETLIFY.md" para o manual completo com fotos.
+`);
+
+  // 4. Pre-configured Project Manifests & Build Setup
+  zip.file('package.json', JSON.stringify({
+    name: "wono-advocacia",
+    private: true,
+    version: "2.5.0",
+    type: "module",
+    scripts: {
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview"
+    },
+    engines: {
+      "node": ">=20.0.0"
+    }
+  }, null, 2));
+
+  // 5. Database Scripts & Initial Backup Payload
+  const postgresSql = generatePostgreSqlScript(data);
+  zip.file('schema_postgresql_supabase.sql', postgresSql);
+
+  const initialBackupJson = JSON.stringify({
+    version: '2.5.0',
+    exportDate: new Date().toISOString(),
+    office: data.office,
+    clients: data.clients,
+    processes: data.processes,
+    deadlines: data.deadlines,
+    documents: data.documents,
+    teamMembers: data.teamMembers,
+    financialRecords: data.financialRecords,
+    saasConfig: data.saasConfig,
+    auditLogs: data.auditLogs,
+  }, null, 2);
+  zip.file(`backup_inicial_escritorio_${dateStr}.json`, initialBackupJson);
+
+  // Generate and trigger download
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `instalador_netlify_wono_advocacia_${dateStr}.zip`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
  * Triggers direct download of a single specific file
  */
 export function downloadSingleInstallerFile(filename: string, content: string, mimeType = 'text/plain') {
@@ -1042,3 +1435,4 @@ export function downloadSingleInstallerFile(filename: string, content: string, m
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+

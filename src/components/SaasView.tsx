@@ -137,6 +137,9 @@ export const SaasView: React.FC<SaasViewProps> = ({
 
   // Search and filters
   const [teamSearch, setTeamSearch] = useState('');
+  const [teamViewMode, setTeamViewMode] = useState<'lista' | 'niveis'>('lista');
+  const [selectedMatrixRole, setSelectedMatrixRole] = useState<TeamMemberRole>('Advogado Pleno');
+  const [selectedMatrixPrivilege, setSelectedMatrixPrivilege] = useState<'total' | 'parcial' | 'leitura'>('parcial');
   const [finSearch, setFinSearch] = useState('');
   const [finStatusFilter, setFinStatusFilter] = useState<string>('todos');
 
@@ -619,114 +622,331 @@ export const SaasView: React.FC<SaasViewProps> = ({
       {/* Subtab 1: Gestão de Equipe (CRUD) */}
       {activeSubTab === 'equipe' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={teamSearch}
-                onChange={(e) => setTeamSearch(e.target.value)}
-                placeholder="Buscar membro por nome, OAB, cargo ou e-mail..."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
-              />
-            </div>
-
+          {/* Toggle between Operator List and Permission Matrix */}
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800/80 self-start inline-flex">
             <button
-              onClick={() => handleOpenTeamModal()}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition shadow-lg shadow-amber-500/20"
+              onClick={() => setTeamViewMode('lista')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                teamViewMode === 'lista'
+                  ? 'bg-amber-500 text-slate-950 shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              <Plus className="w-4 h-4" />
-              Adicionar Advogado / Membro
+              <Users className="w-3.5 h-3.5" />
+              Operadores Cadastrados ({filteredTeam.length})
+            </button>
+            <button
+              onClick={() => setTeamViewMode('niveis')}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                teamViewMode === 'niveis'
+                  ? 'bg-amber-500 text-slate-950 shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Níveis & Permissões (Matriz)
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTeam.map((member) => (
-              <div
-                key={member.id}
-                className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 shadow-lg space-y-4 transition flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-11 h-11 rounded-xl bg-gradient-to-tr ${member.avatarColor} text-white font-black text-sm flex items-center justify-center shadow`}>
-                        {member.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+          {teamViewMode === 'lista' ? (
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={teamSearch}
+                    onChange={(e) => setTeamSearch(e.target.value)}
+                    placeholder="Buscar membro por nome, OAB, cargo ou e-mail..."
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <button
+                  onClick={() => handleOpenTeamModal()}
+                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition shadow-lg shadow-amber-500/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar Advogado / Membro
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredTeam.map((member) => (
+                  <div
+                    key={member.id}
+                    className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 shadow-lg space-y-4 transition flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-11 h-11 rounded-xl bg-gradient-to-tr ${member.avatarColor} text-white font-black text-sm flex items-center justify-center shadow`}>
+                            {member.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-slate-100 text-sm">{member.name}</h4>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold border border-slate-700 inline-block">
+                                {member.role}
+                              </span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                                member.privilege === 'total' 
+                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
+                                  : member.privilege === 'parcial'
+                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                  : 'bg-slate-800 text-slate-400 border border-slate-700'
+                              }`}>
+                                {member.privilege === 'total' ? 'Master' : member.privilege === 'parcial' ? 'Parcial' : 'Leitura'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                          member.status === 'ativo' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300'
+                        }`}>
+                          {member.status.toUpperCase()}
+                        </span>
                       </div>
-                      <div>
-                        <h4 className="font-bold text-slate-100 text-sm">{member.name}</h4>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-semibold border border-slate-700 inline-block">
-                            {member.role}
-                          </span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
-                            member.privilege === 'total' 
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
-                              : member.privilege === 'parcial'
-                              ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700'
-                          }`}>
-                            {member.privilege === 'total' ? 'Master' : member.privilege === 'parcial' ? 'Parcial' : 'Leitura'}
-                          </span>
+
+                      <div className="space-y-1 text-xs text-slate-400 pt-2 border-t border-slate-800">
+                        {member.oabNumber && (
+                          <p className="flex items-center justify-between">
+                            <span>Inscrição OAB:</span>
+                            <strong className="text-slate-200 font-mono">OAB/{member.oabState} nº {member.oabNumber}</strong>
+                          </p>
+                        )}
+                        <p className="flex items-center justify-between">
+                          <span>E-mail:</span>
+                          <span className="text-slate-300 truncate max-w-[180px]">{member.email}</span>
+                        </p>
+                        <p className="flex items-center justify-between">
+                          <span>Telefone:</span>
+                          <span className="text-slate-300">{member.phone || 'Não informado'}</span>
+                        </p>
+                        <p className="flex items-center justify-between">
+                          <span>Processos Ativos:</span>
+                          <span className="text-amber-400 font-bold">{member.casesAssignedCount} causas</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
+                      <button
+                        onClick={() => handleOpenTeamModal(member)}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition"
+                        title="Editar Membro"
+                      >
+                        <Edit className="w-3.5 h-3.5 text-amber-400" />
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDeleteConfirm({
+                            isOpen: true,
+                            type: 'team',
+                            id: member.id,
+                            title: member.name,
+                          });
+                        }}
+                        className="p-2 bg-red-950/30 hover:bg-red-900/50 text-red-400 border border-red-800/40 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition"
+                        title="Excluir Membro"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-6">
+              {/* Informative Grid for User Access Matrix */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
+                <div className="border-b border-slate-850 pb-3">
+                  <h3 className="text-sm font-extrabold text-slate-200 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    Matriz Geral de Níveis de Permissão no Workspace
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Entenda detalhadamente o que cada nível de privilégio pode ler, cadastrar, editar ou apagar.
+                  </p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400 font-bold">
+                        <th className="py-2.5">Funcionalidade / Módulo</th>
+                        <th className="py-2.5 text-center">Privilégio Total (Master)</th>
+                        <th className="py-2.5 text-center">Privilégio Parcial</th>
+                        <th className="py-2.5 text-center">Sem Privilégios (Leitura)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-850/60 text-slate-300">
+                      <tr>
+                        <td className="py-3 font-semibold">Visualizar Painel Geral (Dashboard)</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Total</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Total</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Total</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-semibold">Cadastrar/Editar Clientes e Processos</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Liberado</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Liberado</td>
+                        <td className="py-3 text-center text-rose-400 font-bold">✗ Bloqueado</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-semibold">Excluir Registros (Mover para Lixeira)</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Liberado</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Liberado</td>
+                        <td className="py-3 text-center text-rose-400 font-bold">✗ Bloqueado</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-semibold">Gerar Procurações & Contratos Digitais</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Liberado</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Liberado</td>
+                        <td className="py-3 text-center text-rose-400 font-bold">✗ Bloqueado</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-semibold">Visualizar Caixa & Movimentações Financeiras</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Liberado</td>
+                        <td className="py-3 text-center text-rose-400 font-bold">✗ Bloqueado</td>
+                        <td className="py-3 text-center text-rose-400 font-bold">✗ Bloqueado</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-semibold">Gerenciar Membros da Equipe & Operadores</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Liberado</td>
+                        <td className="py-3 text-center text-rose-400 font-bold">✗ Bloqueado</td>
+                        <td className="py-3 text-center text-rose-400 font-bold">✗ Bloqueado</td>
+                      </tr>
+                      <tr>
+                        <td className="py-3 font-semibold">Excluir Definitivamente / Zerar Workspace</td>
+                        <td className="py-3 text-center text-emerald-400 font-bold">✓ Requer Senha</td>
+                        <td className="py-3 text-center text-rose-400 font-bold">✗ Bloqueado</td>
+                        <td className="py-3 text-center text-rose-400 font-bold">✗ Bloqueado</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Interactive Privilege and Role Simulator */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-5">
+                <div className="border-b border-slate-850 pb-3">
+                  <h3 className="text-sm font-extrabold text-slate-200 flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-amber-400" />
+                    Simulador Interativo de Nível de Usuário
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Selecione um Cargo e um Nível de Privilégio abaixo para analisar as permissões de acesso calculadas pelo sistema.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Selector controls */}
+                  <div className="space-y-4 bg-slate-950 p-4.5 rounded-xl border border-slate-850">
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1.5 text-xs uppercase tracking-wider">
+                        Cargo / Função do Advogado:
+                      </label>
+                      <select
+                        value={selectedMatrixRole}
+                        onChange={(e) => setSelectedMatrixRole(e.target.value as TeamMemberRole)}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-100 focus:border-amber-500 focus:outline-none font-semibold"
+                      >
+                        <option value="Sócio Administrador">Sócio Administrador (Geral)</option>
+                        <option value="Advogado Sênior">Advogado Sênior</option>
+                        <option value="Advogado Pleno">Advogado Pleno</option>
+                        <option value="Advogado Júnior">Advogado Júnior</option>
+                        <option value="Paralegal / Estagiário">Paralegal / Estagiário</option>
+                        <option value="Financeiro & Administrativo">Financeiro & Administrativo</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-bold mb-1.5 text-xs uppercase tracking-wider">
+                        Nível de Privilégio Atribuído:
+                      </label>
+                      <select
+                        value={selectedMatrixPrivilege}
+                        onChange={(e) => setSelectedMatrixPrivilege(e.target.value as any)}
+                        className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-100 focus:border-amber-500 focus:outline-none font-semibold"
+                      >
+                        <option value="total">Privilégio Total (Master)</option>
+                        <option value="parcial">Privilégio Parcial (Criação/Edição)</option>
+                        <option value="leitura">Sem Privilégios (Apenas Consulta / Leitura)</option>
+                      </select>
+                    </div>
+
+                    <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-3 text-[11px] text-slate-400 space-y-1.5">
+                      <p className="font-semibold text-amber-400 flex items-center gap-1">
+                        💡 Como testar na prática?
+                      </p>
+                      <p className="leading-relaxed">
+                        Para testar esses níveis na prática e ver as restrições bloquearem visualizações ou ações, basta usar o seletor <strong>"Operador"</strong> no topo direito da tela (na barra superior) e alternar entre os usuários cadastrados!
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Simulator outcome breakdown */}
+                  <div className="space-y-3 bg-slate-950 p-4.5 rounded-xl border border-slate-850 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Resultado da Simulação:</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-black">
+                          {selectedMatrixRole}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center justify-between p-2 rounded bg-slate-900">
+                          <span className="text-slate-300">Acesso a Relatórios e Painel Principal:</span>
+                          <span className="text-emerald-400 font-bold flex items-center gap-1">✓ Autorizado</span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-slate-900">
+                          <span className="text-slate-300">Modificar Clientes e Processos:</span>
+                          {selectedMatrixPrivilege !== 'leitura' ? (
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">✓ Autorizado</span>
+                          ) : (
+                            <span className="text-rose-400 font-bold flex items-center gap-1">✗ Bloqueado</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-slate-900">
+                          <span className="text-slate-300">Gerar Procurações & Contratos:</span>
+                          {selectedMatrixPrivilege !== 'leitura' ? (
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">✓ Autorizado</span>
+                          ) : (
+                            <span className="text-rose-400 font-bold flex items-center gap-1">✗ Bloqueado</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-slate-900">
+                          <span className="text-slate-300">Visualizar Dados Financeiros (SaaS):</span>
+                          {(selectedMatrixPrivilege === 'total' || selectedMatrixRole === 'Sócio Administrador') ? (
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">✓ Autorizado</span>
+                          ) : (
+                            <span className="text-rose-400 font-bold flex items-center gap-1">✗ Bloqueado</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-slate-900">
+                          <span className="text-slate-300">Configurar Banco e Servidor:</span>
+                          {selectedMatrixPrivilege === 'total' ? (
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">✓ Autorizado</span>
+                          ) : (
+                            <span className="text-rose-400 font-bold flex items-center gap-1">✗ Bloqueado</span>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
-                      member.status === 'ativo' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300'
-                    }`}>
-                      {member.status.toUpperCase()}
-                    </span>
+                    <div className="text-[11px] text-slate-400 pt-2 border-t border-slate-800 italic text-center">
+                      Configuração automática via modelo de privilégio de segurança Wono ADV.
+                    </div>
                   </div>
-
-                  <div className="space-y-1 text-xs text-slate-400 pt-2 border-t border-slate-800">
-                    {member.oabNumber && (
-                      <p className="flex items-center justify-between">
-                        <span>Inscrição OAB:</span>
-                        <strong className="text-slate-200 font-mono">OAB/{member.oabState} nº {member.oabNumber}</strong>
-                      </p>
-                    )}
-                    <p className="flex items-center justify-between">
-                      <span>E-mail:</span>
-                      <span className="text-slate-300 truncate max-w-[180px]">{member.email}</span>
-                    </p>
-                    <p className="flex items-center justify-between">
-                      <span>Telefone:</span>
-                      <span className="text-slate-300">{member.phone || 'Não informado'}</span>
-                    </p>
-                    <p className="flex items-center justify-between">
-                      <span>Processos Ativos:</span>
-                      <span className="text-amber-400 font-bold">{member.casesAssignedCount} causas</span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
-                  <button
-                    onClick={() => handleOpenTeamModal(member)}
-                    className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition"
-                    title="Editar Membro"
-                  >
-                    <Edit className="w-3.5 h-3.5 text-amber-400" />
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => {
-                      setDeleteConfirm({
-                        isOpen: true,
-                        type: 'team',
-                        id: member.id,
-                        title: member.name,
-                      });
-                    }}
-                    className="p-2 bg-red-950/30 hover:bg-red-900/50 text-red-400 border border-red-800/40 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition"
-                    title="Excluir Membro"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 

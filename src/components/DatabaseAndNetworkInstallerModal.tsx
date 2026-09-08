@@ -39,6 +39,7 @@ import {
 } from '../types';
 import { 
   downloadCompleteInstallerPackageZip, 
+  downloadNetlifyInstallerPackageZip,
   downloadSingleInstallerFile,
   generatePostgreSqlScript, 
   generateSqliteScript, 
@@ -50,6 +51,11 @@ import {
   generateRenderYaml,
   generateVercelJson,
   generateNetlifyToml,
+  generateNetlifyRedirects,
+  generateNetlifyDeployBat,
+  generateNetlifyDeploySh,
+  generateNetlifyDropBat,
+  generateNetlifyGuideMd,
   generateProcfile,
   generateEnvExample,
   generateDockerCompose, 
@@ -71,6 +77,7 @@ interface DatabaseAndNetworkInstallerModalProps {
   saasConfig?: SaaSTenantConfig;
   auditLogs?: AuditLog[];
   onImportFullBackup?: (data: any) => void;
+  initialTab?: 'servidor_gratis' | 'publicar_netlify' | 'pwa_mobile' | 'rede_local' | 'banco_dados' | 'modo_offline' | 'guia_passos';
 }
 
 export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstallerModalProps> = ({
@@ -86,12 +93,15 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
   saasConfig,
   auditLogs = [],
   onImportFullBackup,
+  initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'servidor_gratis' | 'publicar_netlify' | 'pwa_mobile' | 'rede_local' | 'banco_dados' | 'modo_offline' | 'guia_passos'>('pwa_mobile');
+  const [activeTab, setActiveTab] = useState<'servidor_gratis' | 'publicar_netlify' | 'pwa_mobile' | 'rede_local' | 'banco_dados' | 'modo_offline' | 'guia_passos'>(initialTab || 'pwa_mobile');
   const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
   const [showIOSManualGuide, setShowIOSManualGuide] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isGeneratingZip, setIsGeneratingZip] = useState(false);
+  const [isGeneratingNetlifyZip, setIsGeneratingNetlifyZip] = useState(false);
+  const [isDownloadingNetlifyDist, setIsDownloadingNetlifyDist] = useState(false);
   const [networkInfo, setNetworkInfo] = useState<{
     hostname: string;
     localUrl: string;
@@ -108,6 +118,13 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
 
   const [simulatedOfflineMode, setSimulatedOfflineMode] = useState(false);
   const [sqlFormat, setSqlFormat] = useState<'postgres' | 'sqlite'>('postgres');
+
+  // Sync initial tab when changed
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Fetch real host network info from backend if available
   useEffect(() => {
@@ -168,6 +185,42 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
       alert('Erro ao compactar o pacote. Você pode baixar os arquivos individualmente nos botões abaixo.');
     } finally {
       setIsGeneratingZip(false);
+    }
+  };
+
+  const handleDownloadNetlifyPackageZip = async () => {
+    try {
+      setIsGeneratingNetlifyZip(true);
+      await downloadNetlifyInstallerPackageZip(installerPayload);
+    } catch (err) {
+      console.error('Erro ao gerar instalador Netlify:', err);
+      alert('Não foi possível gerar o pacote Netlify completo. Você pode baixar o netlify.toml avulso.');
+    } finally {
+      setIsGeneratingNetlifyZip(false);
+    }
+  };
+
+  const handleDownloadNetlifyDistZip = async () => {
+    try {
+      setIsDownloadingNetlifyDist(true);
+      const res = await fetch('/api/download-netlify-dist');
+      if (!res.ok) {
+        throw new Error('Falha ao baixar pacote compilado');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'wono_advocacia_dist_netlify_drop.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.warn('API de pré-build indisponível, gerando pacote Netlify completo...', err);
+      await handleDownloadNetlifyPackageZip();
+    } finally {
+      setIsDownloadingNetlifyDist(false);
     }
   };
 
@@ -330,109 +383,156 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
               
               {/* Main Netlify Header Card */}
               <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-teal-500/30 p-5 rounded-2xl space-y-4 shadow-xl shadow-teal-950/20">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-teal-500/20">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-slate-950 font-black shadow-lg shadow-teal-500/20 shrink-0">
                       <Globe className="w-6 h-6" />
                     </div>
                     <div>
-                      <h4 className="text-base font-black text-slate-100 flex items-center gap-2">
-                        Como Publicar Grátis no Netlify
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-base font-black text-slate-100">
+                          Instalador & Publicador para o Netlify
+                        </h4>
                         <span className="bg-teal-500/20 text-teal-300 border border-teal-500/40 text-[10px] px-2 py-0.5 rounded font-black tracking-wide uppercase">
                           Hospedagem R$ 0,00 • Sem Limites de Acesso
                         </span>
-                      </h4>
-                      <p className="text-xs text-slate-400">
-                        O Netlify é a melhor plataforma gratuita para colocar a interface do WonoJuris online em menos de 2 minutos. Escolha o seu método de publicação abaixo.
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                        Coloque o Wono Advocacia online para toda a sua equipe e clientes em menos de 1 minuto. Baixe o instalador completo ou o pacote estático pronto para arrastar no Netlify Drop.
                       </p>
                     </div>
                   </div>
 
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleDownloadNetlifyPackageZip}
+                      disabled={isGeneratingNetlifyZip}
+                      className="px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-teal-500/25 flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {isGeneratingNetlifyZip ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                          <span>Compactando Pacote...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FolderArchive className="w-4 h-4 text-slate-950" />
+                          <span>Gerar Instalador Netlify (.ZIP)</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={handleDownloadNetlifyDistZip}
+                      disabled={isDownloadingNetlifyDist}
+                      className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/40 font-bold text-xs rounded-xl shadow-sm flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
+                      title="Baixar pacote pronto para arrastar no Netlify Drop"
+                    >
+                      {isDownloadingNetlifyDist ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin text-teal-400" />
+                          <span>Baixando dist...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Download className="w-4 h-4 text-teal-400" />
+                          <span>Pacote Netlify Drop (.ZIP)</span>
+                        </>
+                      )}
+                    </button>
+
+                    <a
+                      href="https://app.netlify.com/drop"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 font-bold text-xs rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
+                      <span>Abrir Drop</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Quick File Downloads Toolbar */}
+                <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-[11px] font-bold text-slate-400 mr-1 flex items-center gap-1">
+                    <FileCode className="w-3.5 h-3.5 text-teal-400" />
+                    Arquivos Individuais:
+                  </span>
+
                   <button
                     onClick={() => downloadSingleInstallerFile('netlify.toml', generateNetlifyToml(), 'text/plain')}
-                    className="px-4 py-2 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-teal-500/20 flex items-center gap-2 transition cursor-pointer"
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-[11px] font-mono transition flex items-center gap-1 cursor-pointer"
                   >
-                    <Download className="w-4 h-4 text-slate-950" />
-                    <span>Baixar arquivo netlify.toml</span>
+                    <Download className="w-3 h-3 text-teal-400" />
+                    <span>netlify.toml</span>
+                  </button>
+
+                  <button
+                    onClick={() => downloadSingleInstallerFile('_redirects', generateNetlifyRedirects(), 'text/plain')}
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-[11px] font-mono transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Download className="w-3 h-3 text-teal-400" />
+                    <span>_redirects</span>
+                  </button>
+
+                  <button
+                    onClick={() => downloadSingleInstallerFile('deploy_netlify.bat', generateNetlifyDeployBat(), 'text/plain')}
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-[11px] font-mono transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Terminal className="w-3 h-3 text-emerald-400" />
+                    <span>deploy_netlify.bat</span>
+                  </button>
+
+                  <button
+                    onClick={() => downloadSingleInstallerFile('preparar_netlify_drop.bat', generateNetlifyDropBat(), 'text/plain')}
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-[11px] font-mono transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Zap className="w-3 h-3 text-amber-400" />
+                    <span>preparar_netlify_drop.bat</span>
+                  </button>
+
+                  <button
+                    onClick={() => downloadSingleInstallerFile('deploy_netlify.sh', generateNetlifyDeploySh(), 'text/plain')}
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-[11px] font-mono transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Terminal className="w-3 h-3 text-sky-400" />
+                    <span>deploy_netlify.sh</span>
+                  </button>
+
+                  <button
+                    onClick={() => downloadSingleInstallerFile('GUIA_INSTALADOR_NETLIFY.md', generateNetlifyGuideMd(installerPayload), 'text/markdown')}
+                    className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-[11px] font-bold transition flex items-center gap-1 cursor-pointer ml-auto text-teal-300"
+                  >
+                    <BookOpen className="w-3 h-3 text-teal-400" />
+                    <span>Manual Completo (.md)</span>
                   </button>
                 </div>
               </div>
 
-              {/* TWO METHODS: GitHub vs. Netlify Drop */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* THREE METHODS: Drop vs GitHub vs CLI */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 
-                {/* METHOD 1: GitHub Continuous Integration */}
-                <div className="bg-slate-950 border border-teal-500/20 p-5 rounded-2xl space-y-4 flex flex-col justify-between shadow-sm">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-teal-500 text-slate-950 font-black text-xs flex items-center justify-center">A</span>
-                        <h5 className="font-extrabold text-sm text-slate-100">Método Recomendado: Via GitHub (Deploy Automático)</h5>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      Conecte o seu repositório de código diretamente à sua conta do Netlify. Toda vez que você fizer uma atualização no GitHub, o Netlify recompila e atualiza o seu site automaticamente!
-                    </p>
-
-                    {/* Step list */}
-                    <div className="p-3 bg-slate-900/90 rounded-xl space-y-2 border border-slate-800 text-xs text-slate-300">
-                      <div className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-                        <span>O arquivo <strong className="text-white">netlify.toml</strong> já está incluído na raiz do projeto.</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-                        <span>Crie um site no Netlify e escolha a opção <strong className="text-white">"Import from Git"</strong>.</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-                        <span>Selecione seu repositório do GitHub com este código.</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
-                        <span>O Netlify lerá a configuração e fará o deploy instantaneamente!</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 pt-2 border-t border-slate-900">
-                    <div className="flex flex-col gap-2">
-                      <div className="flex justify-between items-center text-[11px] text-slate-400 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 font-mono">
-                        <span>Command:</span>
-                        <span className="text-teal-400 font-bold">npm run build</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[11px] text-slate-400 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 font-mono">
-                        <span>Directory:</span>
-                        <span className="text-teal-400 font-bold">dist</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* METHOD 2: Netlify Drop (Drag & Drop folder) */}
+                {/* METHOD 1: Netlify Drop */}
                 <div className="bg-slate-950 border border-emerald-500/20 p-5 rounded-2xl space-y-4 flex flex-col justify-between shadow-sm">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-full bg-emerald-500 text-slate-950 font-black text-xs flex items-center justify-center">B</span>
-                        <h5 className="font-extrabold text-sm text-slate-100">Método Rápido: Netlify Drop (Arrastar Pasta)</h5>
+                        <span className="w-6 h-6 rounded-full bg-emerald-500 text-slate-950 font-black text-xs flex items-center justify-center">1</span>
+                        <h5 className="font-extrabold text-sm text-slate-100">Netlify Drop (30 Segundos)</h5>
                       </div>
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Mais Rápido</span>
                     </div>
 
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      Não quer usar o GitHub? Você pode rodar a compilação local no seu computador usando o comando <code className="text-slate-200 font-mono">npm run build</code>, e arrastar a pasta <strong className="text-white">dist</strong> diretamente na tela do Netlify Drop!
+                      Não quer instalar nada no terminal? Baixe o pacote pronto e apenas arraste para dentro do navegador.
                     </p>
 
                     {/* Step list */}
                     <div className="p-3 bg-slate-900/90 rounded-xl space-y-2 border border-slate-800 text-xs text-slate-300">
                       <div className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>Abra o terminal no projeto e execute <strong className="text-white">npm run build</strong>.</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>Isso criará uma pasta chamada <strong className="text-white">dist/</strong> no seu PC.</span>
+                        <span>Clique no botão <strong className="text-white">"Pacote Netlify Drop (.ZIP)"</strong> acima.</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
@@ -440,23 +540,155 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
                       </div>
                       <div className="flex items-start gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>Arraste a pasta <strong className="text-white">dist/</strong> para dentro da página para ficar online!</span>
+                        <span>Arraste o arquivo baixado para a tela do Netlify.</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <span>Seu site estará online instantaneamente com HTTPS!</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-2 pt-2 border-t border-slate-900">
                     <button
-                      onClick={handleDownloadAllZip}
-                      disabled={isGeneratingZip}
+                      onClick={handleDownloadNetlifyDistZip}
+                      disabled={isDownloadingNetlifyDist}
                       className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>{isGeneratingZip ? 'Gerando Pacote...' : 'Baixar Código Pronto (.ZIP)'}</span>
+                      <span>{isDownloadingNetlifyDist ? 'Baixando...' : 'Baixar Pacote Drop (.ZIP)'}</span>
                     </button>
                   </div>
                 </div>
 
+                {/* METHOD 2: GitHub CI/CD */}
+                <div className="bg-slate-950 border border-teal-500/20 p-5 rounded-2xl space-y-4 flex flex-col justify-between shadow-sm">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-teal-500 text-slate-950 font-black text-xs flex items-center justify-center">2</span>
+                        <h5 className="font-extrabold text-sm text-slate-100">GitHub (Deploy Contínuo)</h5>
+                      </div>
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-teal-500/20 text-teal-300">Recomendado</span>
+                    </div>
+
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Conecte seu repositório Git. Toda vez que você fizer uma atualização, o Netlify compila e publica sozinho.
+                    </p>
+
+                    {/* Step list */}
+                    <div className="p-3 bg-slate-900/90 rounded-xl space-y-2 border border-slate-800 text-xs text-slate-300">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                        <span>O arquivo <strong className="text-white">netlify.toml</strong> já está incluso na raiz.</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                        <span>No Netlify, escolha <strong className="text-white">"Import from Git"</strong>.</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                        <span>Selecione seu repositório do Wono Advocacia.</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                        <span>Build command: <code className="text-white">npm run build</code> | Publish: <code className="text-white">dist</code>.</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-900">
+                    <a
+                      href="https://app.netlify.com/start"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md text-center"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Conectar Repositório Git</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* METHOD 3: Script 1-Clique Windows / Mac */}
+                <div className="bg-slate-950 border border-purple-500/20 p-5 rounded-2xl space-y-4 flex flex-col justify-between shadow-sm">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-purple-500 text-slate-950 font-black text-xs flex items-center justify-center">3</span>
+                        <h5 className="font-extrabold text-sm text-slate-100">Script 1-Clique (CLI)</h5>
+                      </div>
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">Automático</span>
+                    </div>
+
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Execute o script batch no Windows ou shell no Mac/Linux para compilar e publicar via terminal.
+                    </p>
+
+                    {/* Step list */}
+                    <div className="p-3 bg-slate-900/90 rounded-xl space-y-2 border border-slate-800 text-xs text-slate-300">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                        <span>Dê duplo clique em <strong className="text-white">deploy_netlify.bat</strong>.</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                        <span>O script verifica Node.js e instala Netlify CLI.</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                        <span>Executa o build de produção (<code className="text-white">npm run build</code>).</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                        <span>Publica diretamente em produção com flag <code className="text-white">--prod</code>.</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-900">
+                    <button
+                      onClick={() => downloadSingleInstallerFile('deploy_netlify.bat', generateNetlifyDeployBat(), 'text/plain')}
+                      className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Baixar deploy_netlify.bat</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Domain & Cloud Database Tips Card */}
+              <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-teal-400" />
+                  <h4 className="text-sm font-bold text-slate-100">
+                    Domínio Próprio (ex: www.seuescritorio.adv.br) & Banco na Nuvem
+                  </h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-400">
+                  <div className="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800/60 space-y-1.5">
+                    <h5 className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      Domínio Personalizado & SSL Grátis
+                    </h5>
+                    <p className="leading-relaxed">
+                      No painel do Netlify, vá em <strong>Domain management &gt; Add a domain</strong>. Crie uma entrada DNS CNAME apontando para o seu subdomínio do Netlify e receba um certificado SSL Let's Encrypt gratuito e vitalício.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800/60 space-y-1.5">
+                    <h5 className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <Database className="w-4 h-4 text-teal-400" />
+                      Importar seus Dados Iniciais
+                    </h5>
+                    <p className="leading-relaxed">
+                      O pacote instalador inclui o arquivo <code className="text-teal-300">backup_inicial_escritorio.json</code>. Ao acessar o site publicado no Netlify, vá em <strong>Escritório / Banco de Dados</strong> e clique em <strong>Importar Backup</strong> para restaurar todos os seus processos e clientes!
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Interactive Code Viewer for netlify.toml */}
@@ -464,7 +696,7 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
                 <div className="flex justify-between items-center">
                   <h4 className="text-xs font-black uppercase text-slate-300 tracking-wider flex items-center gap-2">
                     <FileCode className="w-4 h-4 text-teal-400" />
-                    Estrutura de Configuração do arquivo <strong className="text-white font-mono">netlify.toml</strong>:
+                    Arquivo <strong className="text-white font-mono">netlify.toml</strong> (Configuração de Produção):
                   </h4>
                   <button
                     onClick={() => copyToClipboard(generateNetlifyToml(), 'netlify_toml')}
@@ -487,10 +719,6 @@ export const DatabaseAndNetworkInstallerModal: React.FC<DatabaseAndNetworkInstal
                 <pre className="p-4 bg-slate-900 rounded-xl text-teal-300 font-mono text-xs overflow-x-auto border border-slate-800/80 leading-relaxed">
                   {generateNetlifyToml()}
                 </pre>
-
-                <div className="p-3.5 bg-slate-900/50 rounded-xl text-[11px] text-slate-400 leading-relaxed border border-slate-800/60">
-                  <span className="font-bold text-slate-300">Explicação Técnica:</span> Este arquivo define que o comando de build padrão para o Vite no Netlify é <code className="text-slate-300">npm run build</code> e a pasta de publicação final é <code className="text-slate-300">dist</code>. O bloco de <code className="text-slate-300">[[redirects]]</code> é fundamental para garantir que qualquer rota da interface SPA do React funcione corretamente sem dar erro 404 ao atualizar a página.
-                </div>
               </div>
 
             </div>

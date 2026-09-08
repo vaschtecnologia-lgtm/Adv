@@ -16,7 +16,9 @@ import {
   Layers,
   Sparkles,
   Check,
-  Sliders
+  Sliders,
+  FolderArchive,
+  Terminal
 } from 'lucide-react';
 import { 
   LawOfficeSettings, 
@@ -36,6 +38,10 @@ import {
   saveCloudDatabaseConfig,
   CloudDatabaseConfig 
 } from '../services/databaseService';
+import { 
+  downloadNetlifyInstallerPackageZip, 
+  InstallerDataPayload 
+} from '../services/installerPackageService';
 
 interface CloudDatabaseNetlifyViewProps {
   office: LawOfficeSettings;
@@ -81,11 +87,60 @@ export const CloudDatabaseNetlifyView: React.FC<CloudDatabaseNetlifyViewProps> =
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [isGeneratingNetlifyZip, setIsGeneratingNetlifyZip] = useState(false);
+  const [isDownloadingNetlifyDist, setIsDownloadingNetlifyDist] = useState(false);
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 2500);
+  };
+
+  const handleDownloadNetlifyPackageZip = async () => {
+    try {
+      setIsGeneratingNetlifyZip(true);
+      const payload: InstallerDataPayload = {
+        office,
+        clients,
+        processes,
+        deadlines,
+        documents,
+        teamMembers,
+        financialRecords,
+        saasConfig,
+        auditLogs,
+      };
+      await downloadNetlifyInstallerPackageZip(payload);
+    } catch (err) {
+      console.error('Erro ao gerar instalador Netlify:', err);
+      alert('Erro ao gerar instalador Netlify.');
+    } finally {
+      setIsGeneratingNetlifyZip(false);
+    }
+  };
+
+  const handleDownloadNetlifyDistZip = async () => {
+    try {
+      setIsDownloadingNetlifyDist(true);
+      const res = await fetch('/api/download-netlify-dist');
+      if (!res.ok) {
+        throw new Error('Falha ao baixar pacote compilado');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'wono_advocacia_dist_netlify_drop.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.warn('Endpoint de pré-build indisponível, gerando pacote Netlify completo...', err);
+      await handleDownloadNetlifyPackageZip();
+    } finally {
+      setIsDownloadingNetlifyDist(false);
+    }
   };
 
   const handleExportBackup = () => {
@@ -539,7 +594,7 @@ export const CloudDatabaseNetlifyView: React.FC<CloudDatabaseNetlifyViewProps> =
         <div className="space-y-6">
           {/* Top Banner: Netlify Ready */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div className="space-y-1">
                 <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 inline-flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" />
@@ -554,15 +609,67 @@ export const CloudDatabaseNetlifyView: React.FC<CloudDatabaseNetlifyViewProps> =
                 </p>
               </div>
 
-              <a
-                href="https://app.netlify.com"
-                target="_blank"
-                rel="noreferrer"
-                className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer whitespace-nowrap shadow-lg shadow-cyan-500/20"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Acessar Painel Netlify
-              </a>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadNetlifyPackageZip}
+                  disabled={isGeneratingNetlifyZip}
+                  className="px-4 py-2.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 text-xs font-black rounded-xl flex items-center gap-2 transition cursor-pointer whitespace-nowrap shadow-lg shadow-teal-500/20 disabled:opacity-50"
+                >
+                  {isGeneratingNetlifyZip ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                      <span>Gerando Instalador...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FolderArchive className="w-4 h-4 text-slate-950" />
+                      <span>Gerar Instalador Netlify (.ZIP)</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadNetlifyDistZip}
+                  disabled={isDownloadingNetlifyDist}
+                  className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/40 text-xs font-bold rounded-xl flex items-center gap-2 transition cursor-pointer whitespace-nowrap disabled:opacity-50"
+                  title="Baixar pacote estático pronto para o Netlify Drop"
+                >
+                  {isDownloadingNetlifyDist ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-teal-400" />
+                      <span>Baixando dist...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 text-teal-400" />
+                      <span>Pacote Netlify Drop (.ZIP)</span>
+                    </>
+                  )}
+                </button>
+
+                {onOpenDatabaseInstaller && (
+                  <button
+                    type="button"
+                    onClick={onOpenDatabaseInstaller}
+                    className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap"
+                  >
+                    <Server className="w-4 h-4 text-amber-400" />
+                    <span>Scripts & Rede</span>
+                  </button>
+                )}
+
+                <a
+                  href="https://app.netlify.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3.5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer whitespace-nowrap shadow-lg shadow-cyan-500/20"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Painel Netlify
+                </a>
+              </div>
             </div>
           </div>
 
@@ -626,21 +733,33 @@ export const CloudDatabaseNetlifyView: React.FC<CloudDatabaseNetlifyViewProps> =
                 </p>
 
                 <ol className="list-decimal list-inside text-xs text-slate-300 space-y-2 pl-1 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                  <li>Gere os arquivos estáticos executando o build.</li>
+                  <li>Baixe o pacote estático compilado pelo botão abaixo.</li>
                   <li>Acesse <a href="https://app.netlify.com/drop" target="_blank" rel="noreferrer" className="text-amber-400 underline font-semibold">app.netlify.com/drop</a></li>
-                  <li>Arraste a pasta <strong>dist</strong> para a tela.</li>
+                  <li>Arraste o arquivo .zip ou a pasta <strong>dist</strong> para a tela.</li>
                   <li>Seu site ganha um domínio <code>.netlify.app</code> com HTTPS instantâneo!</li>
                 </ol>
               </div>
 
-              <a
-                href="https://app.netlify.com/drop"
-                target="_blank"
-                rel="noreferrer"
-                className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer text-center"
-              >
-                Abrir Netlify Drop <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              <div className="space-y-2 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={handleDownloadNetlifyDistZip}
+                  disabled={isDownloadingNetlifyDist}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingNetlifyDist ? 'Baixando...' : 'Baixar Pacote Drop (.ZIP)'}</span>
+                </button>
+
+                <a
+                  href="https://app.netlify.com/drop"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition cursor-pointer text-center"
+                >
+                  Abrir Netlify Drop <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
             </div>
 
             {/* Método 2: Conectar com GitHub */}
