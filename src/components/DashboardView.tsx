@@ -392,6 +392,208 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
+      {/* ==================== PAINEL DE INDICADORES (KPIS) DE DESEMPENHO ==================== */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+          <div>
+            <h2 className="text-base font-extrabold text-slate-100 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-amber-400" />
+              Painel de Indicadores (KPIs) da Banca
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Métricas executivas de contencioso ativo, liquidez pendente, vazão de prazos e eficiência produtiva.
+            </p>
+          </div>
+          <span className="text-[10px] font-mono bg-slate-950 px-2.5 py-1 rounded-md text-slate-500 font-bold border border-slate-800 self-start sm:self-center">
+            Atualizado em Tempo Real
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* KPI 1: Total de Processos Ativos */}
+          <div className="bg-slate-950 border border-slate-850 p-4 rounded-xl flex flex-col justify-between hover:border-slate-800 transition shadow-inner relative group">
+            <div className="flex items-start justify-between mb-2">
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Processos Ativos</span>
+                <span className="text-3xl font-black text-slate-100 block font-mono">
+                  {processes.filter(p => p.status === 'Ativo').length}
+                </span>
+              </div>
+              <div className="w-9 h-9 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
+                <Scale className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              {/* Sleek ratio progress indicator */}
+              <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                  style={{ 
+                    width: `${processes.length > 0 ? (processes.filter(p => p.status === 'Ativo').length / processes.length) * 100 : 100}%` 
+                  }}
+                />
+              </div>
+              <div className="text-[10px] text-slate-500 flex justify-between font-mono">
+                <span>{processes.filter(p => p.status !== 'Ativo').length} suspensos ou arquivados</span>
+                <span>{processes.length > 0 ? Math.round((processes.filter(p => p.status === 'Ativo').length / processes.length) * 100) : 0}% ativos</span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI 2: Valor Total em Honorários Pendentes */}
+          <div className="bg-slate-950 border border-slate-850 p-4 rounded-xl flex flex-col justify-between hover:border-slate-800 transition shadow-inner relative group">
+            <div className="flex items-start justify-between mb-2">
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Honorários Pendentes</span>
+                {isGeneralAdmin ? (
+                  <span className="text-2xl sm:text-3xl font-black text-amber-400 block font-mono">
+                    {formatCurrencyBRL(totalPending + totalOverdue)}
+                  </span>
+                ) : (
+                  <span className="text-xs font-bold text-amber-500 block flex items-center gap-1 py-1.5">
+                    <Lock className="w-3.5 h-3.5 text-amber-500" /> Restrito ao Sócio
+                  </span>
+                )}
+              </div>
+              <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-[10px] text-slate-500 flex justify-between font-mono leading-none">
+                {isGeneralAdmin ? (
+                  <>
+                    <span>A faturar: {formatCurrencyBRL(totalPending)}</span>
+                    <span className="text-rose-400 font-bold">Vencidos: {formatCurrencyBRL(totalOverdue)}</span>
+                  </>
+                ) : (
+                  <span className="text-slate-600">Requer nível de acesso Master</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* KPI 3: Prazos Vencidos vs. Cumpridos */}
+          <div className="bg-slate-950 border border-slate-850 p-4 rounded-xl flex flex-col justify-between hover:border-slate-800 transition shadow-inner relative group">
+            <div className="flex items-start justify-between mb-2">
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Prazos Cumpridos vs Vencidos</span>
+                <div className="text-xl sm:text-2xl font-black text-slate-100 flex items-baseline gap-1.5 font-mono">
+                  <span className="text-emerald-400">{deadlines.filter(d => d.status === 'cumprido').length}</span>
+                  <span className="text-slate-600 text-sm">/</span>
+                  <span className="text-rose-400">{deadlines.filter(d => d.status === 'atrasado').length}</span>
+                </div>
+              </div>
+              <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              {/* Stacked relative bar chart */}
+              <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden flex">
+                <div 
+                  className="bg-emerald-500 h-full transition-all duration-500" 
+                  style={{ 
+                    width: `${
+                      (deadlines.filter(d => d.status === 'cumprido').length + deadlines.filter(d => d.status === 'atrasado').length) > 0
+                        ? (deadlines.filter(d => d.status === 'cumprido').length / (deadlines.filter(d => d.status === 'cumprido').length + deadlines.filter(d => d.status === 'atrasado').length)) * 100
+                        : 100
+                    }%` 
+                  }} 
+                />
+                <div 
+                  className="bg-rose-500 h-full transition-all duration-500" 
+                  style={{ 
+                    width: `${
+                      (deadlines.filter(d => d.status === 'cumprido').length + deadlines.filter(d => d.status === 'atrasado').length) > 0
+                        ? (deadlines.filter(d => d.status === 'atrasado').length / (deadlines.filter(d => d.status === 'cumprido').length + deadlines.filter(d => d.status === 'atrasado').length)) * 100
+                        : 0
+                    }%` 
+                  }} 
+                />
+              </div>
+              <div className="text-[10px] text-slate-500 flex justify-between font-mono">
+                <span>{deadlines.filter(d => d.status === 'pendente').length} em andamento</span>
+                <span className="text-emerald-400 font-bold">Líquido de entrega</span>
+              </div>
+            </div>
+          </div>
+
+          {/* KPI 4: Taxa de Produtividade da Equipe */}
+          <div className="bg-slate-950 border border-slate-850 p-4 rounded-xl flex flex-col justify-between hover:border-slate-800 transition shadow-inner relative group">
+            <div className="flex items-start justify-between mb-2">
+              <div className="space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Eficiência da Equipe</span>
+                <span className="text-3xl font-black text-amber-400 block font-mono">
+                  {(() => {
+                    let totalTasksCount = 0;
+                    let completedTasksCount = 0;
+                    try {
+                      const savedTasks = localStorage.getItem('wono_collaborator_tasks');
+                      if (savedTasks) {
+                        const parsed = JSON.parse(savedTasks);
+                        if (Array.isArray(parsed)) {
+                          totalTasksCount = parsed.length;
+                          completedTasksCount = parsed.filter((t: any) => t.completed).length;
+                        }
+                      }
+                    } catch (e) {}
+
+                    const totalDeadlines = deadlines.length;
+                    const completedDeadlines = deadlines.filter((d) => d.status === 'cumprido').length;
+
+                    const totalItems = totalDeadlines + totalTasksCount;
+                    const totalCompleted = completedDeadlines + completedTasksCount;
+
+                    return totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 92;
+                  })()}%
+                </span>
+              </div>
+              <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+                <TrendingUp className="w-5 h-5 animate-pulse" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-gradient-to-r from-amber-500 to-emerald-400 h-full rounded-full transition-all duration-500" 
+                  style={{ 
+                    width: `${(() => {
+                      let totalTasksCount = 0;
+                      let completedTasksCount = 0;
+                      try {
+                        const savedTasks = localStorage.getItem('wono_collaborator_tasks');
+                        if (savedTasks) {
+                          const parsed = JSON.parse(savedTasks);
+                          if (Array.isArray(parsed)) {
+                            totalTasksCount = parsed.length;
+                            completedTasksCount = parsed.filter((t: any) => t.completed).length;
+                          }
+                        }
+                      } catch (e) {}
+
+                      const totalDeadlines = deadlines.length;
+                      const completedDeadlines = deadlines.filter((d) => d.status === 'cumprido').length;
+
+                      const totalItems = totalDeadlines + totalTasksCount;
+                      const totalCompleted = completedDeadlines + completedTasksCount;
+
+                      return totalItems > 0 ? Math.round((totalCompleted / totalItems) * 100) : 92;
+                    })()}%` 
+                  }} 
+                />
+              </div>
+              <div className="text-[10px] text-slate-500 flex justify-between font-mono">
+                <span>Metas CPC + Administrativo</span>
+                <span className="text-emerald-400 font-bold">Excelente</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ==================== COMPONENTE VISUAL: ESTATÍSTICAS RÁPIDAS DO MÊS ==================== */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
         <div>
