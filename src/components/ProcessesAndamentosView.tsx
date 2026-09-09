@@ -1248,6 +1248,18 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
               <Search className="w-10 h-10 text-slate-600 mx-auto" />
               <p className="text-sm font-semibold text-slate-300">Nenhum andamento ou publicação localizado para os filtros selecionados.</p>
               <p className="text-xs text-slate-500">Tente ajustar o termo de busca ou redefinir a categoria.</p>
+              
+              {feedSearchTerm.trim() && (
+                <div className="pt-2">
+                  <button
+                    onClick={() => handleDeepLinkSearch(feedSearchTerm.trim())}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 mx-auto cursor-pointer shadow-lg shadow-blue-600/30"
+                  >
+                    <Search className="w-4 h-4" /> Consultar "{feedSearchTerm.trim()}" no DataJud / CNJ Online
+                  </button>
+                </div>
+              )}
+
               <button
                 onClick={() => {
                   setFeedCategoryFilter('all');
@@ -2325,6 +2337,7 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
         <AdvancedOnlineSearch
           onImportProcess={handleImportProcess}
           clients={clients}
+          initialQuery={onlineSearchQuery}
         />
       )}
 

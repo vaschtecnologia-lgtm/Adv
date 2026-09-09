@@ -25,6 +25,7 @@ import {
   HelpCircle,
   BookOpen,
   Sliders,
+  Clipboard,
 } from 'lucide-react';
 import { 
   ALL_BRAZILIAN_COURTS, 
@@ -38,6 +39,7 @@ interface AdvancedOnlineSearchProps {
   onImportProcess: (processData: any) => void;
   clients: Client[];
   onClose?: () => void;
+  initialQuery?: string;
 }
 
 type SearchMode = 'pje_official' | 'smart_detector';
@@ -46,6 +48,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
   onImportProcess,
   clients,
   onClose,
+  initialQuery,
 }) => {
   // Theme and search mode selection
   const [searchMode, setSearchMode] = useState<SearchMode>('pje_official');
@@ -57,11 +60,11 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
   const [cnjSeq, setCnjSeq] = useState(''); // 7 digits
   const [cnjDig, setCnjDig] = useState(''); // 2 digits
   const [cnjAno, setCnjAno] = useState(''); // 4 digits
-  const [cnjJus, setCnjJus] = useState('8'); // 1 digit (8 = Justiça Estadual por padrão)
-  const [cnjTrib, setCnjTrib] = useState('09'); // 2 digits (09 = TJGO por padrão)
-  const [cnjOrg, setCnjOrg] = useState('0051'); // 4 digits (0051 = Goiânia por padrão)
+  const [cnjJus, setCnjJus] = useState(''); // 1 digit
+  const [cnjTrib, setCnjTrib] = useState(''); // 2 digits
+  const [cnjOrg, setCnjOrg] = useState(''); // 4 digits
 
-  const [useSplitCNJ, setUseSplitCNJ] = useState(true);
+  const [useSplitCNJ, setUseSplitCNJ] = useState(false);
   const [cnjUnified, setCnjUnified] = useState('');
 
   // General Search Fields
@@ -110,11 +113,52 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
     }
   };
 
+  // Smart paste support for split CNJ fields - automatically distributes 20 digits across all boxes
+  const handlePasteSplit = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData('text').trim();
+    const digits = text.replace(/\D/g, '');
+    if (digits.length >= 14) {
+      e.preventDefault();
+      const padded = digits.padEnd(20, '0');
+      const seq = padded.slice(0, 7);
+      const dig = padded.slice(7, 9);
+      const ano = padded.slice(9, 13);
+      const jus = padded.slice(13, 14);
+      const trib = padded.slice(14, 16);
+      const org = padded.slice(16, 20);
+
+      setCnjSeq(seq);
+      setCnjDig(dig);
+      setCnjAno(ano);
+      setCnjJus(jus);
+      setCnjTrib(trib);
+      setCnjOrg(org);
+
+      const detected = identifyCourtFromCNJ(text);
+      if (detected) {
+        setSelectedTribunal(detected.sigla);
+      }
+    }
+  };
+
   // Synchronize Split CNJ to Unified Search string
   const currentConcatenatedCNJ = useMemo(() => {
-    if (!cnjSeq && !cnjDig && !cnjAno && !cnjJus && !cnjTrib && !cnjOrg) return '';
-    return `${cnjSeq.padStart(7, '0')}-${cnjDig.padStart(2, '0')}.${cnjAno.padStart(4, '0')}.${cnjJus || '0'}.${cnjTrib.padStart(2, '0')}.${cnjOrg.padStart(4, '0')}`;
+    if (!cnjSeq && !cnjDig && !cnjAno) return '';
+    const s = cnjSeq.padStart(7, '0');
+    const d = cnjDig.padStart(2, '0');
+    const a = cnjAno.padStart(4, '0');
+    const j = cnjJus || '8';
+    const t = cnjTrib ? cnjTrib.padStart(2, '0') : '07';
+    const o = cnjOrg ? cnjOrg.padStart(4, '0') : '0001';
+    return `${s}-${d}.${a}.${j}.${t}.${o}`;
   }, [cnjSeq, cnjDig, cnjAno, cnjJus, cnjTrib, cnjOrg]);
+
+  // Detected court from current CNJ input
+  const detectedCourtInfo = useMemo(() => {
+    const query = useSplitCNJ ? currentConcatenatedCNJ : cnjUnified.trim();
+    if (!query || query.length < 5) return null;
+    return identifyCourtFromCNJ(query);
+  }, [useSplitCNJ, currentConcatenatedCNJ, cnjUnified]);
 
   // Unified auto-detection values for smart tab
   const smartDetection = useMemo(() => {
@@ -232,7 +276,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
           queryParam = useSplitCNJ ? currentConcatenatedCNJ : cnjUnified.trim();
           searchTypeParam = 'cnj';
           const detected = identifyCourtFromCNJ(queryParam);
-          if (detected && selectedTribunal === 'TODOS') {
+          if (detected) {
             autoTribunal = detected.sigla;
           }
         } else if (partyQuery.trim()) {
@@ -250,7 +294,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
       // Determine searchTypeParam based on override pattern
       const digitsOnly = queryOverride.replace(/\D/g, '');
       const detectedCourt = identifyCourtFromCNJ(queryOverride);
-      if (detectedCourt || (digitsOnly.length === 20) || (/^\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4}$/.test(queryOverride))) {
+      if (detectedCourt || (digitsOnly.length >= 14) || (/^\d{7}-?\d{2}\.?\d{4}\.?\d\.?\d{2}\.?\d{4}$/.test(queryOverride))) {
         searchTypeParam = 'cnj';
         if (detectedCourt) autoTribunal = detectedCourt.sigla;
       } else if ((/^\d{3}\.?\d{3}\.?\d{3}-?\d{2}$/.test(queryOverride)) || (digitsOnly.length === 11) || (/^\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}$/.test(queryOverride)) || digitsOnly.length === 14) {
@@ -298,14 +342,14 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
     }
   };
 
-  // Auto load query from localStorage on mount (deep linked from other tabs)
+  // Auto load query from prop or localStorage on mount / change
   useEffect(() => {
-    const storedQuery = localStorage.getItem('wono_search_cnj_query');
-    if (storedQuery) {
+    const rawStored = initialQuery || localStorage.getItem('wono_search_cnj_query') || localStorage.getItem('wono_andamentos_prefill_query');
+    if (rawStored && rawStored.trim()) {
+      const storedQuery = rawStored.trim();
       setUseSplitCNJ(false);
       setCnjUnified(storedQuery);
       setSmartQuery(storedQuery);
-      setSearchMode('pje_official');
       
       const detected = identifyCourtFromCNJ(storedQuery);
       let sigla = 'TODOS';
@@ -319,8 +363,9 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
       
       // Clean up to prevent re-triggering
       localStorage.removeItem('wono_search_cnj_query');
+      localStorage.removeItem('wono_andamentos_prefill_query');
     }
-  }, []);
+  }, [initialQuery]);
 
   const handleImportWithFeedback = (proc: any) => {
     onImportProcess(proc);
@@ -450,10 +495,24 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setUseSplitCNJ(!useSplitCNJ);
-                      handleClearForm();
+                      if (useSplitCNJ) {
+                        if (currentConcatenatedCNJ) setCnjUnified(currentConcatenatedCNJ);
+                        setUseSplitCNJ(false);
+                      } else {
+                        const digits = cnjUnified.replace(/\D/g, '');
+                        if (digits.length >= 14) {
+                          const padded = digits.padEnd(20, '0');
+                          setCnjSeq(padded.slice(0, 7));
+                          setCnjDig(padded.slice(7, 9));
+                          setCnjAno(padded.slice(9, 13));
+                          setCnjJus(padded.slice(13, 14));
+                          setCnjTrib(padded.slice(14, 16));
+                          setCnjOrg(padded.slice(16, 20));
+                        }
+                        setUseSplitCNJ(true);
+                      }
                     }}
-                    className="text-[11px] font-bold text-blue-700 hover:underline flex items-center gap-1"
+                    className="text-[11px] font-bold text-blue-700 hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     {useSplitCNJ ? "Alternar para campo único (copiar/colar)" : "Alternar para caixas individuais (PJe padrão)"}
                   </button>
@@ -464,7 +523,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-1.5 font-mono">
                       
-      // Seq (7)
+                      {/* Seq (7) */}
                       <div className="space-y-1">
                         <span className="text-[9px] font-bold text-slate-500 uppercase block">Sequencial</span>
                         <input
@@ -473,6 +532,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                           value={cnjSeq}
                           maxLength={7}
                           onChange={(e) => handleCnjPartChange(e.target.value, 7, 'cnj-dig', null, setCnjSeq)}
+                          onPaste={handlePasteSplit}
                           placeholder="0000000"
                           className="w-[85px] px-2 py-2 text-center bg-white border border-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded text-sm text-slate-900 font-extrabold shadow-inner"
                         />
@@ -490,6 +550,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                           maxLength={2}
                           onChange={(e) => handleCnjPartChange(e.target.value, 2, 'cnj-ano', 'cnj-seq', setCnjDig)}
                           onKeyDown={(e) => handleKeyDownSplit(e, 'cnj-seq')}
+                          onPaste={handlePasteSplit}
                           placeholder="00"
                           className="w-[45px] px-2 py-2 text-center bg-white border border-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded text-sm text-slate-900 font-extrabold shadow-inner"
                         />
@@ -507,6 +568,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                           maxLength={4}
                           onChange={(e) => handleCnjPartChange(e.target.value, 4, 'cnj-jus', 'cnj-dig', setCnjAno)}
                           onKeyDown={(e) => handleKeyDownSplit(e, 'cnj-dig')}
+                          onPaste={handlePasteSplit}
                           placeholder="2024"
                           className="w-[60px] px-2 py-2 text-center bg-white border border-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded text-sm text-slate-900 font-extrabold shadow-inner"
                         />
@@ -524,6 +586,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                           maxLength={1}
                           onChange={(e) => handleCnjPartChange(e.target.value, 1, 'cnj-trib', 'cnj-ano', setCnjJus)}
                           onKeyDown={(e) => handleKeyDownSplit(e, 'cnj-ano')}
+                          onPaste={handlePasteSplit}
                           placeholder="8"
                           className="w-[35px] px-2 py-2 text-center bg-white border border-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded text-sm text-slate-900 font-extrabold shadow-inner"
                         />
@@ -541,6 +604,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                           maxLength={2}
                           onChange={(e) => handleCnjPartChange(e.target.value, 2, 'cnj-org', 'cnj-jus', setCnjTrib)}
                           onKeyDown={(e) => handleKeyDownSplit(e, 'cnj-jus')}
+                          onPaste={handlePasteSplit}
                           placeholder="07"
                           className="w-[45px] px-2 py-2 text-center bg-white border border-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded text-sm text-slate-900 font-extrabold shadow-inner"
                         />
@@ -558,6 +622,7 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
                           maxLength={4}
                           onChange={(e) => handleCnjPartChange(e.target.value, 4, null, 'cnj-trib', setCnjOrg)}
                           onKeyDown={(e) => handleKeyDownSplit(e, 'cnj-trib')}
+                          onPaste={handlePasteSplit}
                           placeholder="0001"
                           className="w-[60px] px-2 py-2 text-center bg-white border border-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded text-sm text-slate-900 font-extrabold shadow-inner"
                         />
@@ -565,22 +630,77 @@ export const AdvancedOnlineSearch: React.FC<AdvancedOnlineSearchProps> = ({
 
                     </div>
                     {currentConcatenatedCNJ && (
-                      <p className="text-[10px] text-slate-500 font-mono">
-                        Consulta formatada: <strong className="text-blue-800 font-bold">{currentConcatenatedCNJ}</strong>
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <p className="text-[10px] text-slate-500 font-mono">
+                          Consulta formatada: <strong className="text-blue-800 font-bold">{currentConcatenatedCNJ}</strong>
+                        </p>
+                        {detectedCourtInfo && (
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            {detectedCourtInfo.sigla} ({detectedCourtInfo.name})
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 ) : (
                   /* Single unified input */
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-bold text-slate-500 block uppercase">Insira o número completo com hífens e pontos:</span>
-                    <input
-                      type="text"
-                      value={cnjUnified}
-                      onChange={(e) => setCnjUnified(e.target.value)}
-                      placeholder="Ex: 0708912-44.2024.8.07.0001"
-                      className="w-full sm:w-80 px-3 py-2 bg-white border border-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded text-sm text-slate-900 font-mono font-bold"
-                    />
+                  <div className="space-y-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <div className="relative flex-1 max-w-md">
+                        <input
+                          type="text"
+                          value={cnjUnified}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCnjUnified(val);
+                            const detected = identifyCourtFromCNJ(val);
+                            if (detected) {
+                              setSelectedTribunal(detected.sigla);
+                            }
+                          }}
+                          placeholder="Ex: 0708912-44.2024.8.07.0001 ou 07089124420248070001"
+                          className="w-full px-3 py-2 bg-white border border-slate-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded text-sm text-slate-900 font-mono font-bold"
+                        />
+                        {cnjUnified && (
+                          <button
+                            type="button"
+                            onClick={() => setCnjUnified('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 px-1 font-bold cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const text = await navigator.clipboard.readText();
+                            if (text) {
+                              const clean = text.trim();
+                              setCnjUnified(clean);
+                              const detected = identifyCourtFromCNJ(clean);
+                              if (detected) setSelectedTribunal(detected.sigla);
+                            }
+                          } catch {
+                            // clipboard fallback
+                          }
+                        }}
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 rounded text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shrink-0"
+                        title="Colar da área de transferência"
+                      >
+                        <Clipboard className="w-3.5 h-3.5 text-slate-500" />
+                        Colar CNJ
+                      </button>
+                    </div>
+
+                    {detectedCourtInfo && (
+                      <div className="inline-flex items-center gap-2 px-2.5 py-1 bg-blue-50 border border-blue-200 text-blue-900 rounded-md text-xs font-semibold">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span>Tribunal identificado: <strong>{detectedCourtInfo.sigla}</strong> — {detectedCourtInfo.name} ({detectedCourtInfo.state})</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

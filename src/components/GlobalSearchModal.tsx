@@ -176,6 +176,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         action: () => {
           localStorage.setItem('wono_andamentos_view_mode', 'search');
           localStorage.setItem('wono_andamentos_prefill_query', searchTerm);
+          localStorage.setItem('wono_search_cnj_query', searchTerm);
           if (onOpenOnlineSearchWithQuery) {
             onOpenOnlineSearchWithQuery(searchTerm);
           } else {
@@ -421,6 +422,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                   onClick={() => {
                     localStorage.setItem('wono_andamentos_view_mode', 'search');
                     localStorage.setItem('wono_andamentos_prefill_query', searchTerm);
+                    localStorage.setItem('wono_search_cnj_query', searchTerm);
                     if (onOpenOnlineSearchWithQuery) {
                       onOpenOnlineSearchWithQuery(searchTerm);
                     } else {
