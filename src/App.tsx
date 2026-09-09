@@ -35,6 +35,7 @@ import { ProcessesAndamentosView } from './components/ProcessesAndamentosView';
 import { DocumentsView } from './components/DocumentsView';
 import { DeadlinesView } from './components/DeadlinesView';
 import { ClientsView } from './components/ClientsView';
+import { EquipeView } from './components/EquipeView';
 import { SaasView } from './components/SaasView';
 import { LixeiraView } from './components/LixeiraView';
 import { SettingsModal } from './components/SettingsModal';
@@ -1496,6 +1497,17 @@ export default function App() {
               setSelectedProcessId(id);
               setCurrentTab('andamentos');
             }}
+            activeUser={activeUser}
+          />
+        )}
+
+        {currentTab === 'equipe' && (
+          <EquipeView
+            teamMembers={teamMembers}
+            processes={processes}
+            onAddTeamMember={handleAddTeamMember}
+            onUpdateTeamMember={handleUpdateTeamMember}
+            onDeleteTeamMember={handleDeleteTeamMember}
             activeUser={activeUser}
           />
         )}

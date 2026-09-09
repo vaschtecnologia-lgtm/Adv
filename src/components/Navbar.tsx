@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { LawOfficeSettings, TeamMember } from '../types';
 
-export type TabType = 'dashboard' | 'andamentos' | 'documentos' | 'prazos' | 'clientes' | 'saas' | 'lixeira';
+export type TabType = 'dashboard' | 'andamentos' | 'documentos' | 'prazos' | 'clientes' | 'equipe' | 'saas' | 'lixeira';
 
 interface NavbarProps {
   currentTab: TabType;
@@ -205,6 +205,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Users className="w-4 h-4" />
               Clientes
+            </button>
+
+            <button
+              onClick={() => onSelectTab('equipe')}
+              className={`px-2.5 xl:px-3 py-2 rounded-lg text-xs xl:text-sm font-medium transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                currentTab === 'equipe'
+                  ? 'bg-slate-800 text-amber-400 shadow-inner'
+                  : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+              }`}
+            >
+              <Users className="w-4 h-4 text-amber-400" />
+              Equipe & Apoio
             </button>
 
             <button
@@ -428,6 +440,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Users className="w-4 h-4" />
             Clientes
+          </button>
+
+          <button
+            onClick={() => onSelectTab('equipe')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold shrink-0 transition ${
+              currentTab === 'equipe'
+                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <Users className="w-4 h-4 text-amber-400" />
+            Equipe
           </button>
 
           <button
