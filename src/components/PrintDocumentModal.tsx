@@ -345,14 +345,17 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
           <div
             className={`bg-white text-slate-900 shadow-2xl rounded-sm w-full max-w-[820px] transition-all border border-slate-200 ${
               fontSize === 'sm' ? 'text-xs' : fontSize === 'lg' ? 'text-base' : 'text-[14pt]'
-            } p-8 sm:p-14 min-h-[1050px] flex flex-col justify-between legal-document-paper`}
+            } p-8 sm:p-14 min-h-[1050px] flex flex-col justify-between legal-document-paper ${
+              showLetterhead ? 'has-detailed-letterhead' : ''
+            }`}
             style={{ 
               fontFamily: 'Arial, Helvetica, sans-serif', 
               fontSize: fontSize === 'sm' ? '12pt' : fontSize === 'lg' ? '16pt' : '14pt',
               lineHeight: '1.6',
               textAlign: 'justify',
               position: 'relative',
-              overflow: 'hidden'
+              overflow: 'hidden',
+              ['--office-name' as any]: `"${(office.officeName || 'WONO ADVOCACIA').toUpperCase()}"`
             }}
           >
             {/* Elegant watermark background (Themis / Lady Justice / Balança da Justiça) */}
@@ -529,14 +532,58 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
                   })}
                 </div>
               )}
+
+              {/* Lawyer Formal Signature Block */}
+              <div className="mt-16 mb-4 flex flex-col items-center justify-center text-center select-none" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                <div className="w-72 border-t border-slate-900 mb-2"></div>
+                <p className="font-bold text-[14pt] text-slate-950 uppercase leading-normal">
+                  {office.primaryLawyer.name}
+                </p>
+                <p className="font-normal text-[14pt] text-slate-700">
+                  Advogado • OAB/{office.primaryLawyer.oabState} nº {office.primaryLawyer.oabNumber}
+                </p>
+              </div>
             </div>
 
-            {/* Document Footer */}
-            {showLetterhead && (
-              <div className="mt-12 pt-3 border-t border-slate-300 text-center text-[9pt] text-slate-500" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
-                Documento emitido eletronicamente por {office.officeName} • CNPJ: {office.cnpj} • Todos os direitos reservados.
+            {/* Document Footer with Official Digital Seal */}
+            <div className="mt-12 pt-3 border-t border-slate-300 flex flex-col md:flex-row items-center justify-between gap-4 text-left" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+              {showLetterhead ? (
+                <div className="text-[9pt] text-slate-500 max-w-[70%]">
+                  Documento emitido eletronicamente por {office.officeName} • CNPJ: {office.cnpj} • Todos os direitos reservados.
+                </div>
+              ) : (
+                <div />
+              )}
+              
+              {/* Official Digital Seal (Selo Digital Oficial) */}
+              <div className="flex items-center gap-2 pointer-events-none opacity-90 select-none print:opacity-100 shrink-0 self-end">
+                <div className="text-[6pt] text-slate-500 text-right font-mono flex flex-col justify-center leading-tight">
+                  <span className="font-bold">SELO DIGITAL</span>
+                  <span>ID: {`WONO-BR-${String(office.primaryLawyer.oabNumber)}-${new Date().getFullYear()}`}</span>
+                  <span className="text-[5pt]">VALIDADO VIA CNJ/DATAJUD</span>
+                </div>
+                <svg
+                  viewBox="0 0 100 100"
+                  className="w-14 h-14 text-slate-700"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                >
+                  {/* Concentric decorative circles */}
+                  <circle cx="50" cy="50" r="46" strokeDasharray="3 2" strokeWidth="1" />
+                  <circle cx="50" cy="50" r="42" strokeWidth="1.5" />
+                  <circle cx="50" cy="50" r="38" strokeWidth="0.8" strokeDasharray="1 1" />
+                  
+                  {/* Balance of Justice icon in center */}
+                  <path d="M50 30 L50 70 M38 42 L62 42 M38 42 L33 58 L43 58 Z M62 42 L57 58 L67 58 Z" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="50" cy="30" r="1.5" fill="currentColor" />
+                  <path d="M42 70 L58 70" strokeWidth="2.5" strokeLinecap="round" />
+
+                  {/* Curving text simulated inside circular seal */}
+                  <circle cx="50" cy="50" r="28" strokeWidth="0.5" strokeDasharray="2 2" />
+                </svg>
               </div>
-            )}
+            </div>
             </div>
           </div>
 

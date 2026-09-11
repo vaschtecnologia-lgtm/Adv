@@ -119,10 +119,49 @@ html.light header .border-slate-800 {
   /* Screen styling for formal legal documents */
   .legal-document-paper {
     position: relative;
-    background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIiBvcGFjaXR5PSIwLjAzNSI+PGNpcmNsZSBjeD0iMTAwIiBjeT0iMTAwIiByPSI5MCIgc3Ryb2tlLWRhc2hhcnJheT0iMyAzIiBzdHJva2Utd2lkdGg9IjAuNSIvPjxjaXJjbGUgY3g9IjEwMCIgY3k9IjEwMCIgcj0iODQiIHN0cm9rZS13aWR0aD0iMC44Ii8+PGNpcmNsZSBjeD0iMTAwIiBjeT0iMzgiIHI9IjYiIHN0cm9rZS13aWR0aD0iMS41Ii8+PHBhdGggZD0iTTk0IDM4IEwxMDYgMzgiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik04OCA1NSBMNzUgMTQ1IEwxMjUgMTQ1IEwxMTIgNTUgWiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48cGF0aCBkPSJNODUgNTUgTDU1IDUwIEw1NSA1OCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48Y2lyY2xlIGN4PSI1NSIgY3k9IjU4IiByPSIxLjUiIGZpbGw9IiMwMDAiLz48cGF0aCBkPSJNMzUgNTggTDc1IDU4IiBzdHJva2Utd2lkdGg9IjEuNSIvPjxwYXRoIGQ9Ik0zNSA1OCBMMjcgODAgTDQzIDgwIFoiIHN0cm9rZS13aWR0aD0iMC44Ii8+PHBhdGggZD0iTTI1IDgwIEw0NSA4MCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48Y2lyY2xlIGN4PSI3NSIgY3k9IjU4IiByPSIxLjUiLz48cGF0aCBkPSJNNzUgNTggTDY3IDgwIEw4MyA4MCBaIiBzdHJva2Utd2lkdGg9IjAuOCIvPjxwYXRoIGQ9Ik02NSA4MCBMODUgODAnIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxwYXRoIGQ9Ik0xMTUgNTUgTDE0MCA3MCBMMTQwIDg1JyBzdHJva2Utd2lkdGg9IjEuNSIvPjxwYXRoIGQ9Ik0xNDAgODIgTDE0MCAxNjUnIHN0cm9rZS13aWR0aD0iMi41Ii8+PHBhdGggZD0JNTEzNCA4OCBMMTQ2IDg4IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSnTTE0MCA4MiBMMTQwIDg4IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSdNNjAgMTQ1IEwxNDAgMTQ1IiBzdHJva2Utd2lkdGg9IjIuNSIvPjxwYXRoIGQ9Ik01MCAxNTIgTDE1MCAxNTInIiBzdHJva2Utd2lkdGg9IjMuNSIvPjwvc3ZnPg==");
+    background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMS4yIiBvcGFjaXR5PSIwLjAzNSI+PGNpcmNsZSBjeD0iMTAwIiBjeT0iMTAwIiByPSI5MCIgc3Ryb2tlLWRhc2hhcnJheT0iMyAzIiBzdHJva2Utd2lkdGg9IjAuNSIvPjxjaXJjbGUgY3g9IjEwMCIgY3k9IjEwMCIgcj0iODQiIHN0cm9rZS13aWR0aD0iMC44Ii8+PGNpcmNsZSBjeD0iMTAwIiBjeT0iMzgiIHI9IjYiIHN0cm9rZS13aWR0aD0iMS4yIi8+PHBhdGggZD0iTTk0IDM4IEwxMDYgMzgiIHN0cm9rZS13aWR0aD0iMiIvPjxwYXRoIGQ9Ik04OCA1NSBMNzUgMTQ1IEwxMjUgMTQ1IEwxMTIgNTUgWiIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48bGF0aCBkPSJNODUgNTUgTDU1IDUwIEw1NSA1OCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48Y2lyY2xlIGN4PSI1NSIgY3k9IjU4IiByPSIxLjUiIGZpbGw9IiMwMDAiLz48cGF0aCBkPSJNMzUgNTggTDc1IDU4IiBzdHJva2Utd2lkdGg9IjEuNSIvPjxwYXRoIGQ9Ik0zNSA1OCBMMjcgODAgTDQzIDgwIFoiIHN0cm9rZS13aWR0aD0iMC44Ii8+PHBhdGggZD0iTTI1IDgwIEw0NSA4MCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48Y2lyY2xlIGN4PSI3NSIgY3k9IjU4IiByPSIxLjUiLz48cGF0aCBkPSJNNzUgNTggTDY3IDgwIEw4MyA4MCBaIiBzdHJva2Utd2lkdGg9IjAuOCIvPjxwYXRoIGQ9Ik02NSA4MCBMODUgODAnIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxwYXRoIGQ9Ik0xMTUgNTUgTDE0MCA3MCBMMTQwIDg1JyBzdHJva2Utd2lkdGg9IjEuNSIvPjxwYXRoIGQ9Ik0xNDAgODIgTDE0MCAxNjUnIHN0cm9rZS13aWR0aD0iMi41Ii8+PHBhdGggZD0JNTEzNCA4OCBMMTQ2IDg4IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSnTTE0MCA4MiBMMTQwIDg4IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSdNNjAgMTQ1IEwxNDAgMTQ1IiBzdHJva2Utd2lkdGg9IjIuNSIvPjxwYXRoIGQ9Ik05MCAxNTIgTDE1MCAxNTIiIHN0cm9rZS13aWR0aD0iMy41Ii8+PC9zdmc+");
     background-repeat: no-repeat;
     background-position: center;
     background-size: 550px;
+    border: 6px double #334155 !important;
+  }
+
+  .legal-document-paper::before {
+    content: var(--office-name, "WONO ADVOCACIA");
+    display: block;
+    text-align: center;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 11pt !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.12em;
+    color: #0f172a;
+    border-bottom: 1.5px solid #cbd5e1;
+    padding-bottom: 0.5rem;
+    margin-bottom: 2rem;
+    pointer-events: none;
+    line-height: 1.2;
+  }
+
+  .legal-document-paper.has-detailed-letterhead::before {
+    display: none !important;
+  }
+
+  .legal-document-paper::after {
+    content: "DOCUMENTO OFICIAL";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 4rem;
+    font-weight: 900;
+    color: rgba(15, 23, 42, 0.04);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 0;
   }
 
   /* Specific Header Styles for .legal-document-paper: Strictly Arial 14pt, Titles in UPPERCASE and BOLD, body text in lowercase/regular */
@@ -194,7 +233,7 @@ html.light header .border-slate-800 {
 
     .legal-document-paper {
       box-shadow: none !important;
-      border: none !important;
+      border: 6px double #334155 !important;
       margin: 0 !important;
       padding: 18mm 15mm !important;
       width: 100% !important;

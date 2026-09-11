@@ -52,6 +52,25 @@ import {
   generateReciboHonorariosText,
   generateSubstabelecimentoText
 } from './utils/documentGenerator';
+import {
+  getSupabaseConfig,
+  getSupabase,
+  testSupabaseConnection,
+  syncAllFromSupabase,
+  syncAllToSupabase,
+  upsertSingleRow,
+  deleteSingleRow,
+  purgeAllSupabaseTables,
+  mapOfficeToDb,
+  mapTeamToDb,
+  mapClientToDb,
+  mapProcessToDb,
+  mapMovementToDb,
+  mapDeadlineToDb,
+  mapDocumentToDb,
+  mapFinancialToDb,
+  mapAuditToDb
+} from './services/supabaseService';
 
 export default function App() {
   // Navigation State
@@ -59,6 +78,10 @@ export default function App() {
   const [appMode, setAppMode] = useState<'playground' | 'wono'>(() => {
     return (localStorage.getItem('wono_app_mode') as 'playground' | 'wono') || 'playground';
   });
+
+  // Supabase Sync States
+  const [supabaseStatus, setSupabaseStatus] = useState<'connected' | 'error' | 'offline' | 'syncing' | 'ready'>('offline');
+  const [supabaseMessage, setSupabaseMessage] = useState<string>('');
 
   // Persistence State
   const [office, setOffice] = useState<LawOfficeSettings>(() => {
@@ -91,12 +114,10 @@ export default function App() {
         if (Array.isArray(parsed)) return parsed;
       } catch {}
     }
-    const isCleared = localStorage.getItem('wono_system_cleared');
-    return isCleared === 'true' ? [] : initialClients;
+    return []; // Empty by default (system cleared/zeroed)
   });
 
   const [processes, setProcesses] = useState<LegalProcess[]>(() => {
-    const isCleared = localStorage.getItem('wono_system_cleared');
     const saved = localStorage.getItem('juris_processes');
     if (saved !== null) {
       try {
@@ -126,10 +147,10 @@ export default function App() {
           });
         }
       } catch {
-        return isCleared === 'true' ? [] : initialProcesses;
+        return [];
       }
     }
-    return isCleared === 'true' ? [] : initialProcesses;
+    return []; // Empty by default (system cleared/zeroed)
   });
 
   const [deadlines, setDeadlines] = useState<ProcessDeadline[]>(() => {
@@ -140,8 +161,7 @@ export default function App() {
         if (Array.isArray(parsed)) return parsed;
       } catch {}
     }
-    const isCleared = localStorage.getItem('wono_system_cleared');
-    return isCleared === 'true' ? [] : initialDeadlines;
+    return []; // Empty by default (system cleared/zeroed)
   });
 
   const [documents, setDocuments] = useState<LegalDocumentItem[]>(() => {
@@ -152,8 +172,7 @@ export default function App() {
         if (Array.isArray(parsed)) return parsed;
       } catch {}
     }
-    const isCleared = localStorage.getItem('wono_system_cleared');
-    return isCleared === 'true' ? [] : initialDocuments;
+    return []; // Empty by default (system cleared/zeroed)
   });
 
   // SaaS and Multi-Tenant Module State
@@ -209,8 +228,7 @@ export default function App() {
         if (Array.isArray(parsed)) return parsed;
       } catch {}
     }
-    const isCleared = localStorage.getItem('wono_system_cleared');
-    return isCleared === 'true' ? [] : initialFinancialRecords;
+    return []; // Empty by default (system cleared/zeroed)
   });
 
   const [saasConfig, setSaasConfig] = useState<SaaSTenantConfig>(() => {
@@ -226,8 +244,7 @@ export default function App() {
         if (Array.isArray(parsed)) return parsed;
       } catch {}
     }
-    const isCleared = localStorage.getItem('wono_system_cleared');
-    return isCleared === 'true' ? [] : initialAuditLogs;
+    return []; // Empty by default (system cleared/zeroed)
   });
 
   // Dark / Light Theme State with Persistence
@@ -245,8 +262,7 @@ export default function App() {
         if (Array.isArray(parsed)) return parsed;
       } catch {}
     }
-    const isCleared = localStorage.getItem('wono_system_cleared');
-    return isCleared === 'true' ? [] : initialTrashItems;
+    return []; // Empty by default (system cleared/zeroed)
   });
 
   // UI States
@@ -261,6 +277,59 @@ export default function App() {
 
   // Native Browser Notifications Permission State
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  // Supabase Initial Boot-up & Sync Engine
+  useEffect(() => {
+    const initSupabase = async () => {
+      const config = getSupabaseConfig();
+      if (!config.isConfigured) {
+        setSupabaseStatus('offline');
+        setSupabaseMessage('Banco de dados em modo offline (LocalStorage). Adicione suas credenciais Supabase nas Configurações.');
+        return;
+      }
+
+      setSupabaseStatus('syncing');
+      setSupabaseMessage('Verificando conexão com o Supabase Cloud...');
+
+      const testRes = await testSupabaseConnection();
+      if (!testRes.success) {
+        setSupabaseStatus('error');
+        setSupabaseMessage(`Falha de conexão: ${testRes.message}`);
+        return;
+      }
+
+      setSupabaseStatus('ready');
+      setSupabaseMessage('Conectado ao Supabase! Carregando dados...');
+
+      const syncRes = await syncAllFromSupabase();
+      if (syncRes.success && syncRes.data) {
+        // Update states with the synchronized cloud data if successful and there are tables
+        if (syncRes.data.office) setOffice(syncRes.data.office);
+        if (Array.isArray(syncRes.data.clients)) setClients(syncRes.data.clients);
+        if (Array.isArray(syncRes.data.processes)) {
+          setProcesses(syncRes.data.processes);
+          if (syncRes.data.processes.length > 0) {
+            setSelectedProcessId(syncRes.data.processes[0].id);
+          }
+        }
+        if (Array.isArray(syncRes.data.deadlines)) setDeadlines(syncRes.data.deadlines);
+        if (Array.isArray(syncRes.data.documents)) setDocuments(syncRes.data.documents);
+        if (Array.isArray(syncRes.data.teamMembers) && syncRes.data.teamMembers.length > 0) {
+          setTeamMembers(syncRes.data.teamMembers);
+        }
+        if (Array.isArray(syncRes.data.financialRecords)) setFinancialRecords(syncRes.data.financialRecords);
+        if (Array.isArray(syncRes.data.auditLogs)) setAuditLogs(syncRes.data.auditLogs);
+
+        setSupabaseStatus('connected');
+        setSupabaseMessage('Sincronizado em tempo real com o Supabase Cloud.');
+      } else {
+        setSupabaseStatus('error');
+        setSupabaseMessage(`Erro de sincronização: ${syncRes.message || 'Verifique as tabelas.'}`);
+      }
+    };
+
+    initSupabase();
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -657,6 +726,14 @@ export default function App() {
     setProcesses((prev) => [newProc, ...prev]);
     setSelectedProcessId(newProc.id);
     logAction('CREATE', 'PROCESSO', `Processo CNJ ${newProc.cnjNumber} autuado para ${newProc.activeParty}`);
+
+    // Supabase background sync
+    upsertSingleRow('legal_processes', mapProcessToDb(newProc));
+    if (Array.isArray(newProc.movements)) {
+      newProc.movements.forEach((m) => {
+        upsertSingleRow('process_movements', mapMovementToDb(m, newProc.id));
+      });
+    }
   };
 
   const handleBulkImportProcesses = (
@@ -689,16 +766,31 @@ export default function App() {
           });
           const index = updatedList.findIndex((p) => p.id === existing.id);
           if (index !== -1) {
-            updatedList[index] = {
+            const mergedProc = {
               ...existing,
               ...newProc,
               id: existing.id,
               movements: mergedMovements,
               lastSyncDate: new Date().toISOString(),
             };
+            updatedList[index] = mergedProc;
+            
+            // Sync merged process and movements to Supabase
+            upsertSingleRow('legal_processes', mapProcessToDb(mergedProc));
+            mergedMovements.forEach((m) => {
+              upsertSingleRow('process_movements', mapMovementToDb(m, existing.id));
+            });
           }
         } else {
           updatedList.unshift(newProc);
+          
+          // Sync new process and movements to Supabase
+          upsertSingleRow('legal_processes', mapProcessToDb(newProc));
+          if (Array.isArray(newProc.movements)) {
+            newProc.movements.forEach((m) => {
+              upsertSingleRow('process_movements', mapMovementToDb(m, newProc.id));
+            });
+          }
         }
       });
 
@@ -715,6 +807,10 @@ export default function App() {
           const cleanName = nc.name.trim().toLowerCase();
           return !existingCpfs.has(cleanCpf) && !existingNames.has(cleanName);
         });
+        
+        // Sync to Supabase
+        toAdd.forEach((c) => upsertSingleRow('clients', mapClientToDb(c)));
+        
         return [...toAdd, ...prevClients];
       });
     }
@@ -728,6 +824,10 @@ export default function App() {
         const toAdd = newDeadlinesToImport.filter(
           (nd) => !existingKeys.has(`${nd.processNumber}_${nd.title}_${nd.fatalDate}`)
         );
+        
+        // Sync to Supabase
+        toAdd.forEach((d) => upsertSingleRow('process_deadlines', mapDeadlineToDb(d)));
+        
         return [...toAdd, ...prevDeadlines];
       });
     }
@@ -749,6 +849,14 @@ export default function App() {
   const handleUpdateProcess = (updatedProc: LegalProcess) => {
     setProcesses((prev) => prev.map((p) => (p.id === updatedProc.id ? updatedProc : p)));
     logAction('UPDATE', 'PROCESSO', `Processo ${updatedProc.cnjNumber} atualizado`);
+    
+    // Supabase background sync
+    upsertSingleRow('legal_processes', mapProcessToDb(updatedProc));
+    if (Array.isArray(updatedProc.movements)) {
+      updatedProc.movements.forEach((m) => {
+        upsertSingleRow('process_movements', mapMovementToDb(m, updatedProc.id));
+      });
+    }
   };
 
   const handleDeleteProcess = (processId: string) => {
@@ -795,6 +903,9 @@ export default function App() {
     logAction('DELETE', 'PROCESSO', `Processo ${proc?.cnjNumber || processId} movido para a Lixeira`);
     setSyncToastMessage('🗑️ Processo movido para a Lixeira com sucesso!');
     setTimeout(() => setSyncToastMessage(null), 4000);
+
+    // Supabase background deletion
+    deleteSingleRow('legal_processes', processId);
   };
 
   const handleAddMovement = (processId: string, movement: ProcessMovement) => {
@@ -811,6 +922,9 @@ export default function App() {
       })
     );
     logAction('CREATE', 'PROCESSO', `Andamento "${movement.title}" registrado no processo`);
+
+    // Supabase background sync
+    upsertSingleRow('process_movements', mapMovementToDb(movement, processId));
   };
 
   const handleDeleteMovement = (processId: string, movementId: string) => {
@@ -826,6 +940,9 @@ export default function App() {
       })
     );
     logAction('DELETE', 'PROCESSO', `Andamento removido do processo`);
+
+    // Supabase background deletion
+    deleteSingleRow('process_movements', movementId);
   };
 
   const handleUpdateMovement = (processId: string, updatedMovement: ProcessMovement) => {
@@ -843,6 +960,9 @@ export default function App() {
     logAction('UPDATE', 'PROCESSO', `Andamento "${updatedMovement.title}" atualizado`);
     setSyncToastMessage('⚖️ Andamento processual atualizado com sucesso.');
     setTimeout(() => setSyncToastMessage(null), 4000);
+
+    // Supabase background sync
+    upsertSingleRow('process_movements', mapMovementToDb(updatedMovement, processId));
   };
 
   // Handlers for Deadlines
@@ -853,11 +973,17 @@ export default function App() {
     };
     setDeadlines((prev) => [deadlineItem, ...prev]);
     logAction('CREATE', 'PRAZO', `Prazo "${deadlineItem.title}" fatal em ${deadlineItem.fatalDate}`);
+
+    // Supabase background sync
+    upsertSingleRow('process_deadlines', mapDeadlineToDb(deadlineItem));
   };
 
   const handleUpdateDeadline = (updatedDead: ProcessDeadline) => {
     setDeadlines((prev) => prev.map((d) => (d.id === updatedDead.id ? updatedDead : d)));
     logAction('UPDATE', 'PRAZO', `Prazo "${updatedDead.title}" alterado`);
+
+    // Supabase background sync
+    upsertSingleRow('process_deadlines', mapDeadlineToDb(updatedDead));
   };
 
   const handleDeleteDeadline = (id: string) => {
@@ -887,30 +1013,46 @@ export default function App() {
     logAction('DELETE', 'PRAZO', `Prazo "${dead?.title || id}" movido para a Lixeira`);
     setSyncToastMessage('🗑️ Prazo movido para a Lixeira.');
     setTimeout(() => setSyncToastMessage(null), 4000);
+
+    // Supabase background deletion
+    deleteSingleRow('process_deadlines', id);
   };
 
   const handleToggleDeadlineStatus = (id: string) => {
+    let updatedItem: ProcessDeadline | null = null;
     setDeadlines((prev) =>
       prev.map((d) => {
         if (d.id === id) {
           const nextStatus = d.status === 'cumprido' ? 'pendente' : 'cumprido';
-          return { ...d, status: nextStatus };
+          updatedItem = { ...d, status: nextStatus };
+          return updatedItem;
         }
         return d;
       })
     );
     logAction('UPDATE', 'PRAZO', `Status do prazo alterado`);
+
+    // Supabase background sync
+    if (updatedItem) {
+      upsertSingleRow('process_deadlines', mapDeadlineToDb(updatedItem));
+    }
   };
 
   // Handlers for Clients
   const handleAddClient = (newClient: Client) => {
     setClients((prev) => [newClient, ...prev]);
     logAction('CREATE', 'CLIENTE', `Cliente ${newClient.name} (${newClient.cpfCnpj}) cadastrado`);
+
+    // Supabase background sync
+    upsertSingleRow('clients', mapClientToDb(newClient));
   };
 
   const handleUpdateClient = (updatedClient: Client) => {
     setClients((prev) => prev.map((c) => (c.id === updatedClient.id ? updatedClient : c)));
     logAction('UPDATE', 'CLIENTE', `Dados do cliente ${updatedClient.name} atualizados`);
+
+    // Supabase background sync
+    upsertSingleRow('clients', mapClientToDb(updatedClient));
   };
 
   const handleDeleteClient = (clientId: string) => {
@@ -953,6 +1095,9 @@ export default function App() {
     logAction('DELETE', 'CLIENTE', `Cliente ${client?.name || clientId} movido para a Lixeira`);
     setSyncToastMessage('🗑️ Cliente movido para a Lixeira com sucesso!');
     setTimeout(() => setSyncToastMessage(null), 4000);
+
+    // Supabase background deletion
+    deleteSingleRow('clients', clientId);
   };
 
   const handleConfirmDeleteWithPassword = (e?: React.FormEvent) => {
@@ -983,6 +1128,9 @@ export default function App() {
   const handleAddDocument = (newDoc: LegalDocumentItem) => {
     setDocuments((prev) => [newDoc, ...prev]);
     logAction('CREATE', 'DOCUMENTO', `Documento "${newDoc.title}" gerado para impressão`);
+
+    // Supabase background sync
+    upsertSingleRow('legal_documents', mapDocumentToDb(newDoc));
   };
 
   const handleDeleteDocument = (id: string) => {
@@ -1012,6 +1160,9 @@ export default function App() {
     logAction('DELETE', 'DOCUMENTO', `Documento "${doc?.title || id}" movido para a Lixeira`);
     setSyncToastMessage('🗑️ Documento movido para a Lixeira.');
     setTimeout(() => setSyncToastMessage(null), 4000);
+
+    // Supabase background deletion
+    deleteSingleRow('legal_documents', id);
   };
 
   const handleUpdateDocument = (updatedDoc: LegalDocumentItem) => {
@@ -1019,6 +1170,9 @@ export default function App() {
     logAction('UPDATE', 'DOCUMENTO', `Documento "${updatedDoc.title}" atualizado`);
     setSyncToastMessage(`📄 Documento "${updatedDoc.title}" atualizado com sucesso.`);
     setTimeout(() => setSyncToastMessage(null), 4000);
+
+    // Supabase background sync
+    upsertSingleRow('legal_documents', mapDocumentToDb(updatedDoc));
   };
 
   // Handlers for Team
@@ -1030,11 +1184,17 @@ export default function App() {
     };
     setTeamMembers((prev) => [member, ...prev]);
     logAction('CREATE', 'EQUIPE', `Usuário ${member.name} (${member.role}) adicionado à banca`);
+
+    // Supabase background sync
+    upsertSingleRow('team_members', mapTeamToDb(member));
   };
 
   const handleUpdateTeamMember = (updatedMember: TeamMember) => {
     setTeamMembers((prev) => prev.map((m) => (m.id === updatedMember.id ? updatedMember : m)));
     logAction('UPDATE', 'EQUIPE', `Permissões de ${updatedMember.name} atualizadas`);
+
+    // Supabase background sync
+    upsertSingleRow('team_members', mapTeamToDb(updatedMember));
   };
 
   const handleDeleteTeamMember = (id: string) => {
@@ -1049,6 +1209,9 @@ export default function App() {
     const member = teamMembers.find((m) => m.id === id);
     setTeamMembers((prev) => prev.filter((m) => m.id !== id));
     logAction('DELETE', 'EQUIPE', `Membro ${member?.name || id} revogado da banca`);
+
+    // Supabase background deletion
+    deleteSingleRow('team_members', id);
   };
 
   // Handlers for Finance
@@ -1060,11 +1223,17 @@ export default function App() {
     };
     setFinancialRecords((prev) => [record, ...prev]);
     logAction('CREATE', 'FINANCEIRO', `Lançamento de R$ ${record.amount.toFixed(2)} (${record.type}) - ${record.title}`);
+
+    // Supabase background sync
+    upsertSingleRow('financial_records', mapFinancialToDb(record));
   };
 
   const handleUpdateFinancialRecord = (updatedRec: FinancialRecord) => {
     setFinancialRecords((prev) => prev.map((r) => (r.id === updatedRec.id ? updatedRec : r)));
     logAction('UPDATE', 'FINANCEIRO', `Lançamento ${updatedRec.title} atualizado`);
+
+    // Supabase background sync
+    upsertSingleRow('financial_records', mapFinancialToDb(updatedRec));
   };
 
   const handleDeleteFinancialRecord = (id: string) => {
@@ -1079,6 +1248,9 @@ export default function App() {
     const rec = financialRecords.find((r) => r.id === id);
     setFinancialRecords((prev) => prev.filter((r) => r.id !== id));
     logAction('DELETE', 'FINANCEIRO', `Lançamento "${rec?.title || id}" removido`);
+
+    // Supabase background deletion
+    deleteSingleRow('financial_records', id);
   };
 
   const handleClearFinancialRecords = () => {
@@ -1089,6 +1261,14 @@ export default function App() {
     logAction('DELETE', 'FINANCEIRO', 'Todos os valores financeiros do escritório foram zerados (R$ 0,00)');
     setSyncToastMessage('💰 Todos os valores financeiros foram zerados com sucesso (R$ 0,00).');
     setTimeout(() => setSyncToastMessage(null), 4000);
+
+    // Supabase background wipe for financial_records
+    const supabase = getSupabase();
+    if (supabase) {
+      supabase.from('financial_records').delete().neq('id', 'temp-placeholder-id-to-delete-all').then(() => {
+        console.log('Financeiro do Supabase zerado.');
+      });
+    }
   };
 
   // Handler for SaaS Tenant Config
@@ -1373,8 +1553,23 @@ export default function App() {
     localStorage.setItem('wono_audit_logs', JSON.stringify([]));
     localStorage.setItem('wono_system_cleared', 'true');
 
-    // 3. Trigger visual confirmation message
-    setSyncToastMessage('✅ Sistema zerado com sucesso! Todos os prazos, processos, clientes e documentos foram limpos com sucesso.');
+    const config = getSupabaseConfig();
+    if (config.isConfigured) {
+      // 3. Purge all tables in Supabase in parallel
+      purgeAllSupabaseTables().then((res) => {
+        if (res.success) {
+          console.log('Tabelas do Supabase limpas com sucesso.');
+        } else {
+          console.error('Falha ao limpar tabelas do Supabase:', res.message);
+        }
+      });
+      // 4. Trigger visual confirmation message
+      setSyncToastMessage('✅ Sistema zerado com sucesso! Todos os dados locais e na nuvem (Supabase) foram limpos.');
+    } else {
+      console.log('Modo local: Limpeza concluída. Supabase não está configurado.');
+      setSyncToastMessage('✅ Sistema zerado com sucesso! Todos os dados locais foram limpos.');
+    }
+
     setTimeout(() => {
       setSyncToastMessage(null);
     }, 8000);

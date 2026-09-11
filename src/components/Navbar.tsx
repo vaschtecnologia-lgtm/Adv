@@ -16,6 +16,7 @@ import {
   Server
 } from 'lucide-react';
 import { LawOfficeSettings, TeamMember } from '../types';
+import { getSupabaseConfig } from '../services/supabaseService';
 
 export type TabType = 'dashboard' | 'andamentos' | 'documentos' | 'prazos' | 'clientes' | 'equipe' | 'saas' | 'lixeira';
 
@@ -59,6 +60,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
   onSwitchToPlayground,
 }) => {
+  const config = getSupabaseConfig();
+
   return (
     <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-lg no-print">
       {/* Top micro bar with office and lawyer credentials */}
@@ -67,6 +70,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="flex items-center gap-1.5 text-emerald-400 font-medium whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
             Base DataJud / CNJ Conectada
+          </span>
+          <span className="hidden md:inline text-slate-600">|</span>
+          <span className={`flex items-center gap-1.5 font-medium whitespace-nowrap ${config.isConfigured ? 'text-emerald-400' : 'text-amber-400'}`}>
+            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${config.isConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+            {config.isConfigured ? 'Supabase Nuvem Ativa' : 'Modo Local Offline-First'}
           </span>
           <span className="hidden md:inline text-slate-600">|</span>
           <span className="hidden md:inline truncate max-w-xs xl:max-w-md">
