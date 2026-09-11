@@ -30,6 +30,7 @@ import {
   TrashItem
 } from './types';
 import { Navbar, TabType } from './components/Navbar';
+import { AiStudioPlayground } from './components/AiStudioPlayground';
 import { DashboardView } from './components/DashboardView';
 import { ProcessesAndamentosView } from './components/ProcessesAndamentosView';
 import { DocumentsView } from './components/DocumentsView';
@@ -55,6 +56,9 @@ import {
 export default function App() {
   // Navigation State
   const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
+  const [appMode, setAppMode] = useState<'playground' | 'wono'>(() => {
+    return (localStorage.getItem('wono_app_mode') as 'playground' | 'wono') || 'playground';
+  });
 
   // Persistence State
   const [office, setOffice] = useState<LawOfficeSettings>(() => {
@@ -1405,6 +1409,17 @@ export default function App() {
     (d) => d.status !== 'cumprido' && d.daysLeft <= 3
   ).length;
 
+  if (appMode === 'playground') {
+    return (
+      <AiStudioPlayground
+        onSwitchToWono={() => {
+          setAppMode('wono');
+          localStorage.setItem('wono_app_mode', 'wono');
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
       {/* Toast notification for sync */}
@@ -1433,6 +1448,10 @@ export default function App() {
         trashCount={trashItems.length}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        onSwitchToPlayground={() => {
+          setAppMode('playground');
+          localStorage.setItem('wono_app_mode', 'playground');
+        }}
       />
 
       {/* Main Body Content */}
@@ -1670,6 +1689,7 @@ export default function App() {
             onImportFullBackup={handleImportFullBackup}
             onOpenDatabaseInstaller={() => setIsDatabaseInstallerOpen(true)}
             activeUser={activeUser}
+            onLogAction={logAction}
           />
         )}
 

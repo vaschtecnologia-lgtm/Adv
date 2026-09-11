@@ -36,6 +36,7 @@ interface NavbarProps {
   trashCount?: number;
   theme?: 'dark' | 'light';
   onToggleTheme?: (theme: 'dark' | 'light') => void;
+  onSwitchToPlayground?: () => void;
 }
 
 
@@ -56,6 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   trashCount = 0,
   theme = 'dark',
   onToggleTheme,
+  onSwitchToPlayground,
 }) => {
   return (
     <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-lg no-print">
@@ -72,6 +74,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           </span>
         </div>
         <div className="flex items-center gap-2.5 ml-auto">
+          {onSwitchToPlayground && (
+            <button
+              onClick={onSwitchToPlayground}
+              className="flex items-center gap-1.5 text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition text-[11px] font-bold cursor-pointer py-0.5 px-2.5 rounded-lg shrink-0"
+              title="Acessar o Google AI Studio Multimodal Playground"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
+              <span>Playground IA</span>
+            </button>
+          )}
+
           {onOpenDatabaseInstaller && (
             <button
               onClick={onOpenDatabaseInstaller}

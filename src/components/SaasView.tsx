@@ -44,6 +44,7 @@ import {
 } from '../types';
 import { formatCurrencyBRL } from '../utils/documentGenerator';
 import { CloudDatabaseNetlifyView } from './CloudDatabaseNetlifyView';
+import { DataJudPipelineView } from './DataJudPipelineView';
 
 interface SaasViewProps {
   office: LawOfficeSettings;
@@ -70,6 +71,7 @@ interface SaasViewProps {
   onImportFullBackup?: (importedData: any) => void;
   onOpenDatabaseInstaller?: () => void;
   activeUser?: TeamMember;
+  onLogAction?: (category: string, subCategory: string, description: string) => void;
 }
 
 export const SaasView: React.FC<SaasViewProps> = ({
@@ -97,6 +99,7 @@ export const SaasView: React.FC<SaasViewProps> = ({
   onImportFullBackup = (_importedData: any) => {},
   onOpenDatabaseInstaller,
   activeUser,
+  onLogAction,
 }) => {
   const [zeroFinancialModalOpen, setZeroFinancialModalOpen] = useState(false);
   const tenantConfig = propTenantConfig || propSaasConfig || {
@@ -129,11 +132,11 @@ export const SaasView: React.FC<SaasViewProps> = ({
 
   const isGeneralAdmin = activeUser?.role === 'Sócio Administrador' || activeUser?.privilege === 'total';
 
-  const [activeSubTab, setActiveSubTabState] = useState<'equipe' | 'financeiro' | 'planos' | 'auditoria' | 'banco-dados' | 'deploy-netlify'>(() => {
+  const [activeSubTab, setActiveSubTabState] = useState<'equipe' | 'financeiro' | 'planos' | 'auditoria' | 'banco-dados' | 'deploy-netlify' | 'datajud-pipeline'>(() => {
     return (localStorage.getItem('wono_saas_active_subtab') as any) || 'equipe';
   });
 
-  const setActiveSubTab = (tab: 'equipe' | 'financeiro' | 'planos' | 'auditoria' | 'banco-dados' | 'deploy-netlify') => {
+  const setActiveSubTab = (tab: 'equipe' | 'financeiro' | 'planos' | 'auditoria' | 'banco-dados' | 'deploy-netlify' | 'datajud-pipeline') => {
     localStorage.setItem('wono_saas_active_subtab', tab);
     setActiveSubTabState(tab);
   };
@@ -607,6 +610,18 @@ export const SaasView: React.FC<SaasViewProps> = ({
         >
           <Database className="w-4 h-4 text-emerald-400" />
           Banco de Dados Grátis (Firebase / Supabase)
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('datajud-pipeline')}
+          className={`px-4 py-2 rounded-xl font-bold transition flex items-center gap-2 cursor-pointer ${
+            activeSubTab === 'datajud-pipeline'
+              ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+              : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-850'
+          }`}
+        >
+          <RefreshCw className="w-4 h-4 text-amber-400 animate-spin" style={{ animationDuration: '6s' }} />
+          DataPipeline DataJud & Jus.br
         </button>
 
         <button
@@ -1399,6 +1414,13 @@ export const SaasView: React.FC<SaasViewProps> = ({
           auditLogs={auditLogs}
           onImportFullBackup={onImportFullBackup}
           onOpenDatabaseInstaller={onOpenDatabaseInstaller}
+        />
+      )}
+
+      {activeSubTab === 'datajud-pipeline' && (
+        <DataJudPipelineView
+          processes={processes || []}
+          onLogAction={onLogAction}
         />
       )}
 
