@@ -24,7 +24,8 @@ import {
   generateSubstabelecimentoText, 
   generateReciboHonorariosText,
   formatDateExtenso,
-  formatCurrencyBRL
+  formatCurrencyBRL,
+  formatDocumentToStandardTypography
 } from './documentGenerator';
 
 /**
@@ -161,8 +162,9 @@ export async function createWordDocumentBlob(
     );
   }
 
-  // 2. Parse Markdown paragraphs into docx Paragraphs
-  const rawParagraphs = markdownContent.split('\n\n');
+  // 2. Normalize markdown and parse into docx Paragraphs
+  const normalizedContent = formatDocumentToStandardTypography(markdownContent);
+  const rawParagraphs = normalizedContent.split('\n\n');
 
   for (const raw of rawParagraphs) {
     const trimmed = raw.trim();

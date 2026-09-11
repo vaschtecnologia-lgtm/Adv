@@ -31,7 +31,8 @@ import {
   generateDeclaracaoHipossuficienciaText,
   generateSubstabelecimentoText,
   generateReciboHonorariosText,
-  formatCurrencyBRL 
+  formatCurrencyBRL,
+  formatDocumentToStandardTypography
 } from '../utils/documentGenerator';
 import { downloadDocumentAsWordDocx } from '../utils/docxExportService';
 import { PrintDocumentModal } from './PrintDocumentModal';
@@ -42,6 +43,7 @@ interface DocumentsViewProps {
   processes: LegalProcess[];
   office: LawOfficeSettings;
   onAddDocument: (doc: LegalDocumentItem) => void;
+  onUpdateDocument?: (doc: LegalDocumentItem) => void;
   onDeleteDocument: (id: string) => void;
   activeUser?: any;
 }
@@ -52,9 +54,39 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
   processes,
   office,
   onAddDocument,
+  onUpdateDocument,
   onDeleteDocument,
   activeUser,
 }) => {
+  const [editingDoc, setEditingDoc] = useState<LegalDocumentItem | null>(null);
+  const [editDocTitle, setEditDocTitle] = useState('');
+  const [editDocClientId, setEditDocClientId] = useState('');
+  const [editDocProcessId, setEditDocProcessId] = useState('');
+  const [editDocStatus, setEditDocStatus] = useState<'rascunho' | 'pronto' | 'assinado'>('pronto');
+
+  const handleOpenEditDocModal = (doc: LegalDocumentItem) => {
+    setEditingDoc(doc);
+    setEditDocTitle(doc.title);
+    setEditDocClientId(doc.clientId || '');
+    setEditDocProcessId(doc.processId || '');
+    setEditDocStatus(doc.status || 'pronto');
+  };
+
+  const handleSaveEditedDoc = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDoc) return;
+    const updated: LegalDocumentItem = {
+      ...editingDoc,
+      title: editDocTitle,
+      clientId: editDocClientId,
+      processId: editDocProcessId || undefined,
+      status: editDocStatus,
+    };
+    if (onUpdateDocument) {
+      onUpdateDocument(updated);
+    }
+    setEditingDoc(null);
+  };
   const fallbackClient: Client = {
     id: '',
     name: 'Cliente Não Informado',
@@ -152,24 +184,25 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
     const client = clients.find((c) => c.id === docItem.clientId) || clients[0] || fallbackClient;
     const proc = processes.find((p) => p.id === docItem.processId);
 
+    let raw = '';
     if (docItem.type === 'procuracao') {
-      return generateProcuracaoText(
+      raw = generateProcuracaoText(
         client,
         office,
         docItem.powers || powers,
         proc?.subject
       );
     } else if (docItem.type === 'contrato_honorarios') {
-      return generateContratoHonorariosText(
+      raw = generateContratoHonorariosText(
         client,
         office,
         docItem.fees || fees,
         proc?.subject
       );
     } else if (docItem.type === 'declaracao_hipossuficiencia') {
-      return generateDeclaracaoHipossuficienciaText(client, office);
+      raw = generateDeclaracaoHipossuficienciaText(client, office);
     } else if (docItem.type === 'substabelecimento') {
-      return generateSubstabelecimentoText(
+      raw = generateSubstabelecimentoText(
         office,
         {
           name: docItem.substabelecidoNome || 'Dr. Advogado Colega',
@@ -180,14 +213,14 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
         true
       );
     } else if (docItem.type === 'recibo_honorarios') {
-      return generateReciboHonorariosText(
+      raw = generateReciboHonorariosText(
         client,
         office,
         docItem.receiptValue || 1500,
         docItem.receiptReference || 'Serviços jurídicos'
       );
     }
-    return '';
+    return formatDocumentToStandardTypography(raw);
   };
 
   const handleOpenPrintView = (docItem: LegalDocumentItem) => {
@@ -441,13 +474,24 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
 
               {/* Action buttons */}
               <div className="flex items-center justify-between pt-3 border-t border-slate-800/80 text-xs gap-1.5 flex-wrap">
-                <button
-                  onClick={() => onDeleteDocument(doc.id)}
-                  className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition cursor-pointer"
-                  title="Excluir documento"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleOpenEditDocModal(doc)}
+                    disabled={activeUser?.privilege === 'leitura'}
+                    className="p-1.5 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                    title="Editar informações do documento"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onDeleteDocument(doc.id)}
+                    disabled={activeUser?.privilege === 'leitura'}
+                    className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+                    title="Excluir documento"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
 
                 <div className="flex items-center gap-1.5">
                   {/* Direct Word (.docx) Download Button */}
@@ -834,6 +878,115 @@ export const DocumentsView: React.FC<DocumentsViewProps> = ({
                 >
                   <Printer className="w-4 h-4" />
                   Visualizar / Imprimir A4
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Informações do Documento */}
+      {editingDoc && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+                  <Edit className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-100">Editar Documento</h3>
+                  <p className="text-xs text-slate-400">Atualize o título, cliente vinculado e status da minuta</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingDoc(null)}
+                className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedDoc} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Título do Documento *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editDocTitle}
+                  onChange={(e) => setEditDocTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:border-amber-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Cliente Vinculado *
+                  </label>
+                  <select
+                    value={editDocClientId}
+                    onChange={(e) => setEditDocClientId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:border-amber-500 focus:outline-none"
+                  >
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Status do Documento
+                  </label>
+                  <select
+                    value={editDocStatus}
+                    onChange={(e) => setEditDocStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:border-amber-500 focus:outline-none"
+                  >
+                    <option value="pronto">Pronto</option>
+                    <option value="rascunho">Rascunho</option>
+                    <option value="assinado">Assinado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Processo Vinculado (Opcional)
+                </label>
+                <select
+                  value={editDocProcessId}
+                  onChange={(e) => setEditDocProcessId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:border-amber-500 focus:outline-none"
+                >
+                  <option value="">Nenhum processo vinculado</option>
+                  {processes.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.cnjNumber} - {p.activeParty}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingDoc(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-xl transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition cursor-pointer shadow-lg shadow-amber-500/20"
+                >
+                  Salvar Alterações
                 </button>
               </div>
             </form>

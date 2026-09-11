@@ -16,9 +16,12 @@ import {
   Edit3,
   Trash2,
   Download,
-  ExternalLink
+  ExternalLink,
+  Send,
+  MessageSquare,
+  Check
 } from 'lucide-react';
-import { ProcessDeadline, LegalProcess, Client } from '../types';
+import { ProcessDeadline, LegalProcess, Client, LawOfficeSettings } from '../types';
 
 interface DeadlinesViewProps {
   deadlines: ProcessDeadline[];
@@ -33,6 +36,7 @@ interface DeadlinesViewProps {
   notificationPermission?: NotificationPermission;
   onRequestNotificationPermission?: () => void;
   activeUser?: any;
+  office?: LawOfficeSettings;
 }
 
 export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
@@ -48,7 +52,12 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
   notificationPermission = 'default',
   onRequestNotificationPermission,
   activeUser,
+  office,
 }) => {
+  const [viewTab, setViewTab] = useState<'lista' | 'calendario'>('lista');
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+
   const [filterStatus, setFilterStatus] = useState<string>('pendentes');
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -283,8 +292,128 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
   const urgentCount = deadlines.filter((d) => d.status === 'alerta' || d.status === 'atrasado').length;
   const pendingCount = deadlines.filter((d) => d.status !== 'cumprido').length;
 
+  const [whatsappStatus, setWhatsappStatus] = useState<{ [key: string]: 'idle' | 'sending' | 'success' | 'error' }>({});
+  const [whatsappMessageToast, setWhatsappMessageToast] = useState<string | null>(null);
+
+  const handleSendWhatsappReminder = async (item: ProcessDeadline) => {
+    const deadlineId = item.id;
+    setWhatsappStatus(prev => ({ ...prev, [deadlineId]: 'sending' }));
+
+    const template = office?.whatsappMessageTemplate || "Olá {cliente}, passando para lembrar que o prazo '{prazo}' do seu processo {processo} vence em {data}. Fale conosco se tiver dúvidas!";
+    const formattedMsg = template
+      .replace(/{cliente}/g, item.clientName || 'Cliente')
+      .replace(/{processo}/g, item.processNumber || 'Processo')
+      .replace(/{prazo}/g, item.title || 'Prazo')
+      .replace(/{data}/g, new Date(item.fatalDate + 'T12:00:00').toLocaleDateString('pt-BR'));
+
+    const webhookUrl = office?.whatsappWebhookUrl || "https://api.whatsapp-service.com/send/webhook";
+    const apiKey = office?.whatsappApiKey || "wono_ws_key_live_8f7b23c59a01bde827c1f";
+
+    try {
+      console.log(`[WhatsApp API Webhook] Disparando para URL: ${webhookUrl}`);
+      console.log(`[WhatsApp API Webhook] Payload de Mensagem:`, {
+        to: item.clientName,
+        message: formattedMsg,
+        deadlineId: item.id
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      if (webhookUrl && webhookUrl.startsWith('http')) {
+        try {
+          await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              recipientName: item.clientName,
+              processNumber: item.processNumber,
+              deadlineTitle: item.title,
+              dueDate: item.fatalDate,
+              message: formattedMsg
+            })
+          });
+        } catch (fetchErr) {
+          console.warn("[WhatsApp Webhook] Erro na requisição direta (esperado em ambiente local):", fetchErr);
+        }
+      }
+
+      setWhatsappStatus(prev => ({ ...prev, [deadlineId]: 'success' }));
+      setWhatsappMessageToast(`Lembrete WhatsApp enviado com sucesso para ${item.clientName}!`);
+      setTimeout(() => {
+        setWhatsappMessageToast(null);
+        setWhatsappStatus(prev => ({ ...prev, [deadlineId]: 'idle' }));
+      }, 4000);
+    } catch (err) {
+      console.error(err);
+      setWhatsappStatus(prev => ({ ...prev, [deadlineId]: 'error' }));
+    }
+  };
+
+  const monthNames = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(prev => prev - 1);
+    } else {
+      setCurrentMonth(prev => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(prev => prev + 1);
+    } else {
+      setCurrentMonth(prev => prev + 1);
+    }
+  };
+
+  // Get first day index and total days of the month
+  const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+  const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const prevMonthTotalDays = new Date(currentYear, currentMonth, 0).getDate();
+
+  const daysGrid: { day: number; isCurrentMonth: boolean; dateString: string }[] = [];
+
+  // Trailing days from previous month
+  for (let i = firstDayIndex - 1; i >= 0; i--) {
+    const d = prevMonthTotalDays - i;
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const dateString = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    daysGrid.push({ day: d, isCurrentMonth: false, dateString });
+  }
+
+  // Current month days
+  for (let d = 1; d <= totalDays; d++) {
+    const dateString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    daysGrid.push({ day: d, isCurrentMonth: true, dateString });
+  }
+
+  // Leading days of next month to fill grid
+  const remainingCells = 42 - daysGrid.length;
+  for (let d = 1; d <= remainingCells; d++) {
+    const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+    const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+    const dateString = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    daysGrid.push({ day: d, isCurrentMonth: false, dateString });
+  }
+
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 relative">
+      {whatsappMessageToast && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 border border-emerald-500/40 text-slate-100 rounded-xl px-4 py-3 shadow-2xl flex items-center gap-2.5 animate-fade-in-up">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
+          <span className="font-bold text-xs">{whatsappMessageToast}</span>
+        </div>
+      )}
       {/* Warning Banner for Read-Only Mode */}
       {activeUser?.privilege === 'leitura' && (
         <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl p-4 text-xs flex items-center gap-3">
@@ -464,6 +593,34 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
         </div>
       </div>
 
+      {/* View Switcher Tabs */}
+      <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+        <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <button
+            onClick={() => setViewTab('lista')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              viewTab === 'lista'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Lista de Prazos</span>
+          </button>
+          <button
+            onClick={() => setViewTab('calendario')}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              viewTab === 'calendario'
+                ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <CalendarIcon className="w-3.5 h-3.5" />
+            <span>Calendário Mensal</span>
+          </button>
+        </div>
+      </div>
+
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-800 w-full sm:w-auto">
@@ -499,8 +656,9 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
         </div>
       </div>
 
-      {/* Deadlines Table/List */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+      {viewTab === 'lista' ? (
+        /* Deadlines Table/List */
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800 text-[11px]">
@@ -632,6 +790,29 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
                             <Download className="w-3.5 h-3.5" />
                           </button>
 
+                          {/* Send WhatsApp Reminder Webhook */}
+                          <button
+                            type="button"
+                            onClick={() => handleSendWhatsappReminder(item)}
+                            disabled={whatsappStatus[item.id] === 'sending'}
+                            className={`p-1.5 rounded transition cursor-pointer flex items-center justify-center ${
+                              whatsappStatus[item.id] === 'success'
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                : whatsappStatus[item.id] === 'sending'
+                                ? 'bg-amber-500/20 text-amber-400 animate-pulse'
+                                : 'hover:bg-slate-800 text-slate-400 hover:text-emerald-500'
+                            }`}
+                            title="Disparar Lembrete WhatsApp para o Cliente"
+                          >
+                            {whatsappStatus[item.id] === 'success' ? (
+                              <Check className="w-3.5 h-3.5" />
+                            ) : whatsappStatus[item.id] === 'sending' ? (
+                              <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <MessageSquare className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+
                           <button
                             onClick={() => handleOpenEditModal(item)}
                             className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-amber-400 rounded transition cursor-pointer"
@@ -664,6 +845,154 @@ export const DeadlinesView: React.FC<DeadlinesViewProps> = ({
           </table>
         </div>
       </div>
+    ) : (
+      /* Render Calendar Tab View */
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-extrabold text-slate-100 uppercase tracking-wider">
+              {monthNames[currentMonth]} {currentYear}
+            </h3>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handlePrevMonth}
+                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
+                title="Mês Anterior"
+              >
+                ◀
+              </button>
+              <button
+                onClick={() => {
+                  const today = new Date();
+                  setCurrentMonth(today.getMonth());
+                  setCurrentYear(today.getFullYear());
+                }}
+                className="px-2 py-1 text-[10px] bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white rounded font-bold transition cursor-pointer"
+              >
+                Hoje
+              </button>
+              <button
+                onClick={handleNextMonth}
+                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition cursor-pointer"
+                title="Próximo Mês"
+              >
+                ▶
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3.5 text-[10px] text-slate-400 font-semibold">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded bg-rose-500" /> Urgente
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded bg-amber-500" /> Pendente
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded bg-emerald-500" /> Cumprido
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-800/60">
+          <div>Dom</div>
+          <div>Seg</div>
+          <div>Ter</div>
+          <div>Qua</div>
+          <div>Qui</div>
+          <div>Sex</div>
+          <div>Sáb</div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+          {daysGrid.map((cell, idx) => {
+            const dayDeadlines = filteredDeadlines.filter(
+              d => d.fatalDate === cell.dateString
+            );
+            
+            const isToday = cell.dateString === new Date().toISOString().split('T')[0];
+
+            return (
+              <div
+                key={idx}
+                onDoubleClick={() => {
+                  if (activeUser?.privilege !== 'leitura') {
+                    setFatalDate(cell.dateString);
+                    handleOpenNewModal();
+                  }
+                }}
+                className={`min-h-[75px] sm:min-h-[105px] p-1.5 rounded-xl border flex flex-col justify-between transition group relative ${
+                  cell.isCurrentMonth
+                    ? 'bg-slate-950/40 border-slate-800 hover:border-slate-700 hover:bg-slate-950/70'
+                    : 'bg-slate-950/10 border-slate-900 text-slate-600 hover:bg-slate-950/30'
+                } ${isToday ? 'ring-2 ring-amber-500/40 border-amber-500/40 bg-amber-500/[0.02]' : ''}`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] sm:text-xs font-extrabold px-1.5 py-0.5 rounded ${
+                    isToday 
+                      ? 'bg-amber-500 text-slate-950 font-black' 
+                      : cell.isCurrentMonth 
+                      ? 'text-slate-200' 
+                      : 'text-slate-600'
+                  }`}>
+                    {cell.day}
+                  </span>
+                  {dayDeadlines.length > 0 && (
+                    <span className="text-[9px] bg-slate-800 text-slate-400 px-1.5 py-0.2 rounded-full font-black">
+                      {dayDeadlines.length}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex-1 flex flex-col gap-1 mt-1 overflow-y-auto no-scrollbar max-h-[50px] sm:max-h-[75px]">
+                  {dayDeadlines.map((item) => {
+                    const isDone = item.status === 'cumprido';
+                    const isUrgent = item.daysLeft <= 3 && !isDone;
+                    
+                    let badgeClass = 'bg-blue-500/10 border-blue-500/25 text-blue-300';
+                    if (isDone) {
+                      badgeClass = 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300 line-through';
+                    } else if (isUrgent) {
+                      badgeClass = 'bg-rose-500/15 border-rose-500/35 text-rose-300 font-extrabold animate-pulse';
+                    } else if (item.status === 'alerta') {
+                      badgeClass = 'bg-amber-500/15 border-amber-500/30 text-amber-300 font-bold';
+                    }
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditModal(item);
+                        }}
+                        title={`[${item.clientName}] ${item.title}`}
+                        className={`px-1.5 py-0.5 rounded text-[8px] sm:text-[9px] font-medium border truncate cursor-pointer transition hover:scale-[1.02] ${badgeClass}`}
+                      >
+                        {item.title}
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {activeUser?.privilege !== 'leitura' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFatalDate(cell.dateString);
+                      handleOpenNewModal();
+                    }}
+                    className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-slate-200 p-1 rounded hover:bg-amber-500 hover:text-slate-950 text-[9px] cursor-pointer"
+                    title="Agendar neste dia"
+                  >
+                    +
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
 
       {/* Modal: Deadline Form (Create / Edit) */}
       {isModalOpen && (

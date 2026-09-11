@@ -13,6 +13,7 @@ import {
   User, 
   Check, 
   Edit3,
+  Trash2,
   ExternalLink,
   DollarSign,
   Download,
@@ -372,14 +373,8 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
               return (
                 <div
                   key={c.id}
-                  onClick={() => {
-                    setSelectedClientId(c.id);
-                    if (countProc > 0) {
-                      // Navigate straight to the first process of this client
-                      onSelectProcess(clientProcs[0].id);
-                    }
-                  }}
-                  className={`p-4 rounded-xl border transition cursor-pointer space-y-2 ${
+                  onClick={() => setSelectedClientId(c.id)}
+                  className={`p-4 rounded-xl border transition cursor-pointer space-y-2.5 ${
                     isSelected
                       ? 'bg-slate-850 border-amber-500/60 shadow-md shadow-amber-950/20 ring-1 ring-amber-500/20'
                       : 'bg-slate-900 border-slate-800 hover:border-slate-700'
@@ -399,9 +394,51 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
                   <div className="flex items-center justify-between text-[11px] text-amber-400 font-semibold pt-1 border-t border-slate-800/80">
                     <span>{countProc} processo(s) vinculado(s)</span>
-                    <span className="text-slate-400 text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded text-amber-300">
-                      {countProc > 0 ? 'Acessar Andamentos ➔' : 'Sem processos'}
-                    </span>
+                    {countProc > 0 ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectProcess(clientProcs[0].id);
+                        }}
+                        className="text-slate-400 hover:text-amber-300 text-[10px] bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded text-amber-300 transition cursor-pointer"
+                        title="Ver autos e andamentos do processo"
+                      >
+                        Acessar Andamentos ➔
+                      </button>
+                    ) : (
+                      <span className="text-slate-500 text-[10px]">Sem processos</span>
+                    )}
+                  </div>
+
+                  {/* Direct CRUD actions on card */}
+                  <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-slate-800/50">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedClientId(c.id);
+                        handleOpenEditClientModal(c);
+                      }}
+                      disabled={activeUser?.privilege === 'leitura'}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-amber-300 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                      title="Editar cadastro do cliente"
+                    >
+                      <Edit3 className="w-3 h-3 text-amber-400" />
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteConfirmModal({ isOpen: true, client: c });
+                      }}
+                      disabled={activeUser?.privilege === 'leitura'}
+                      className="p-1 bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] transition cursor-pointer"
+                      title="Excluir cliente"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
               );

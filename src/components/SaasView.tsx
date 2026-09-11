@@ -66,6 +66,7 @@ interface SaasViewProps {
   onAddFinancialRecord: (record: FinancialRecord) => void;
   onUpdateFinancialRecord: (record: FinancialRecord) => void;
   onDeleteFinancialRecord: (id: string) => void;
+  onClearFinancialRecords?: () => void;
   onImportFullBackup?: (importedData: any) => void;
   onOpenDatabaseInstaller?: () => void;
   activeUser?: TeamMember;
@@ -92,10 +93,12 @@ export const SaasView: React.FC<SaasViewProps> = ({
   onAddFinancialRecord,
   onUpdateFinancialRecord,
   onDeleteFinancialRecord,
+  onClearFinancialRecords,
   onImportFullBackup = (_importedData: any) => {},
   onOpenDatabaseInstaller,
   activeUser,
 }) => {
+  const [zeroFinancialModalOpen, setZeroFinancialModalOpen] = useState(false);
   const tenantConfig = propTenantConfig || propSaasConfig || {
     tenantId: 'wono-main',
     plan: 'enterprise',
@@ -1043,14 +1046,73 @@ export const SaasView: React.FC<SaasViewProps> = ({
               </select>
             </div>
 
-            <button
-              onClick={() => handleOpenFinModal()}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition shadow-lg shadow-amber-500/20"
-            >
-              <Plus className="w-4 h-4" />
-              Novo Lançamento Financeiro
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {onClearFinancialRecords && (activeUser?.role === 'Sócio Administrador' || activeUser?.privilege === 'total') && (
+                <button
+                  type="button"
+                  onClick={() => setZeroFinancialModalOpen(true)}
+                  className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition shadow-sm"
+                  title="Zerar todos os lançamentos financeiros do escritório"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Zerar Valores Financeiros
+                </button>
+              )}
+
+              <button
+                onClick={() => handleOpenFinModal()}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer transition shadow-lg shadow-amber-500/20"
+              >
+                <Plus className="w-4 h-4" />
+                Novo Lançamento Financeiro
+              </button>
+            </div>
           </div>
+
+          {/* Modal to Confirm Zeroing Financial Records */}
+          {zeroFinancialModalOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center shrink-0">
+                    <RefreshCw className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-100">Zerar Valores Financeiros</h3>
+                    <p className="text-xs text-slate-400">Redefinição dos registros contábeis e honorários.</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed bg-slate-950 p-3.5 rounded-xl border border-slate-850">
+                  Deseja realmente zerar todos os valores financeiros do escritório? 
+                  Todos os lançamentos de receitas, despesas e honorários serão limpos, e os indicadores financeiros voltarão para <strong>R$ 0,00</strong>.
+                </p>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setZeroFinancialModalOpen(false)}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs rounded-xl transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onClearFinancialRecords) {
+                        onClearFinancialRecords();
+                      }
+                      setZeroFinancialModalOpen(false);
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-red-600/20"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Confirmar e Zerar (R$ 0,00)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Financial Records Table */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">

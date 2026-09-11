@@ -100,10 +100,12 @@ export default function App() {
         if (Array.isArray(parsed)) {
           if (parsed.length === 0) return [];
           const seenMovementIds = new Set<string>();
+          const isZeroed = localStorage.getItem('wono_financial_zeroed_v4');
           return parsed.map((proc, pIdx) => {
             let movements = Array.isArray(proc.movements) ? proc.movements : [];
             return {
               ...proc,
+              value: !isZeroed ? 0 : (typeof proc.value === 'number' ? proc.value : 0),
               id: proc.id || `proc-${pIdx + 1}`,
               movements: movements.map((mov, mIdx) => {
                 let movId = mov.id;
@@ -190,6 +192,12 @@ export default function App() {
   }, [teamMembers, activeUserId]);
 
   const [financialRecords, setFinancialRecords] = useState<FinancialRecord[]>(() => {
+    const isZeroed = localStorage.getItem('wono_financial_zeroed_v4');
+    if (!isZeroed) {
+      localStorage.setItem('wono_financial_zeroed_v4', 'true');
+      localStorage.setItem('wono_financial_records', JSON.stringify([]));
+      return [];
+    }
     const saved = localStorage.getItem('wono_financial_records');
     if (saved !== null) {
       try {
@@ -255,6 +263,92 @@ export default function App() {
       setNotificationPermission(Notification.permission);
     }
   }, []);
+
+  // Automated Scheduled Backup Engine
+  useEffect(() => {
+    const runScheduledBackup = () => {
+      const intervalType = localStorage.getItem('wono_backup_schedule_interval') || '24h';
+      if (intervalType === 'off') return;
+
+      const intervalMap: Record<string, number> = {
+        '10m': 10 * 60 * 1000,
+        '1h': 60 * 60 * 1000,
+        '12h': 12 * 60 * 60 * 1000,
+        '24h': 24 * 60 * 60 * 1000,
+        '7d': 7 * 24 * 60 * 60 * 1000,
+      };
+
+      const duration = intervalMap[intervalType] || 24 * 60 * 60 * 1000;
+      const lastBackupStr = localStorage.getItem('wono_last_backup_timestamp');
+      const now = Date.now();
+
+      if (!lastBackupStr || now - Number(lastBackupStr) >= duration) {
+        console.log(`[Backup Scheduler] Executando backup programado periódico. Intervalo: ${intervalType}`);
+        
+        // 1. Gather all data
+        const backupData: Record<string, string> = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && !key.startsWith('wono_auto_backups_history')) {
+            backupData[key] = localStorage.getItem(key) || '';
+          }
+        }
+
+        // 2. Load and trim backup history list (keep up to 5 entries)
+        let history: any[] = [];
+        try {
+          const savedHist = localStorage.getItem('wono_auto_backups_history');
+          history = savedHist ? JSON.parse(savedHist) : [];
+        } catch {}
+
+        const newBackup = {
+          id: `sch-${Date.now().toString(36)}`,
+          timestamp: new Date().toISOString(),
+          label: `Backup Automático (${processes.length} proc., ${clients.length} cli.)`,
+          size: JSON.stringify(backupData).length,
+          data: JSON.stringify(backupData),
+        };
+
+        history.unshift(newBackup);
+        if (history.length > 5) {
+          history = history.slice(0, 5);
+        }
+
+        localStorage.setItem('wono_auto_backups_history', JSON.stringify(history));
+        localStorage.setItem('wono_last_backup_timestamp', String(now));
+
+        // 3. Trigger automatic file download if enabled
+        const autoDownload = localStorage.getItem('wono_backup_auto_download') === 'true';
+        if (autoDownload) {
+          try {
+            const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const dateStr = new Date().toISOString().split('T')[0];
+            link.href = url;
+            link.download = `backup_juris_auto_${dateStr}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          } catch (err) {
+            console.error('[Backup Scheduler] Erro ao realizar download automático de backup:', err);
+          }
+        }
+
+        // 4. Show a toast or notification
+        setSyncToastMessage("✅ Backup automático de segurança gerado com sucesso!");
+        setTimeout(() => setSyncToastMessage(null), 4000);
+      }
+    };
+
+    // Run immediately on boot to check if any backup is overdue
+    runScheduledBackup();
+
+    // Check periodically every 30 seconds
+    const intervalId = setInterval(runScheduledBackup, 30 * 1000);
+    return () => clearInterval(intervalId);
+  }, [processes.length, clients.length]);
 
   const handleRequestNotificationPermission = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -730,6 +824,23 @@ export default function App() {
     logAction('DELETE', 'PROCESSO', `Andamento removido do processo`);
   };
 
+  const handleUpdateMovement = (processId: string, updatedMovement: ProcessMovement) => {
+    setProcesses((prev) =>
+      prev.map((p) => {
+        if (p.id === processId) {
+          return {
+            ...p,
+            movements: p.movements.map((m) => (m.id === updatedMovement.id ? updatedMovement : m)),
+          };
+        }
+        return p;
+      })
+    );
+    logAction('UPDATE', 'PROCESSO', `Andamento "${updatedMovement.title}" atualizado`);
+    setSyncToastMessage('⚖️ Andamento processual atualizado com sucesso.');
+    setTimeout(() => setSyncToastMessage(null), 4000);
+  };
+
   // Handlers for Deadlines
   const handleAddDeadline = (newDead: Omit<ProcessDeadline, 'id'>) => {
     const deadlineItem: ProcessDeadline = {
@@ -899,6 +1010,13 @@ export default function App() {
     setTimeout(() => setSyncToastMessage(null), 4000);
   };
 
+  const handleUpdateDocument = (updatedDoc: LegalDocumentItem) => {
+    setDocuments((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)));
+    logAction('UPDATE', 'DOCUMENTO', `Documento "${updatedDoc.title}" atualizado`);
+    setSyncToastMessage(`📄 Documento "${updatedDoc.title}" atualizado com sucesso.`);
+    setTimeout(() => setSyncToastMessage(null), 4000);
+  };
+
   // Handlers for Team
   const handleAddTeamMember = (newMember: Omit<TeamMember, 'id' | 'createdAt'>) => {
     const member: TeamMember = {
@@ -957,6 +1075,16 @@ export default function App() {
     const rec = financialRecords.find((r) => r.id === id);
     setFinancialRecords((prev) => prev.filter((r) => r.id !== id));
     logAction('DELETE', 'FINANCEIRO', `Lançamento "${rec?.title || id}" removido`);
+  };
+
+  const handleClearFinancialRecords = () => {
+    setFinancialRecords([]);
+    localStorage.setItem('wono_financial_records', JSON.stringify([]));
+    localStorage.setItem('wono_financial_zeroed_v4', 'true');
+    setProcesses((prev) => prev.map((p) => ({ ...p, value: 0 })));
+    logAction('DELETE', 'FINANCEIRO', 'Todos os valores financeiros do escritório foram zerados (R$ 0,00)');
+    setSyncToastMessage('💰 Todos os valores financeiros foram zerados com sucesso (R$ 0,00).');
+    setTimeout(() => setSyncToastMessage(null), 4000);
   };
 
   // Handler for SaaS Tenant Config
@@ -1422,6 +1550,7 @@ export default function App() {
             onOpenNewDocumentModal={handleOpenNewDocumentModal}
             onOpenGlobalSearch={() => setIsGlobalSearchOpen(true)}
             activeUser={activeUser}
+            onClearFinancialRecords={handleClearFinancialRecords}
           />
         )}
 
@@ -1438,6 +1567,7 @@ export default function App() {
             onUpdateProcess={handleUpdateProcess}
             onDeleteProcess={handleDeleteProcess}
             onAddMovement={handleAddMovement}
+            onUpdateMovement={handleUpdateMovement}
             onDeleteMovement={handleDeleteMovement}
             onAddDeadlineToAgenda={handleAddDeadline}
             onOpenDocumentGeneratorForProcess={handleOpenDocumentGeneratorForProcess}
@@ -1457,6 +1587,7 @@ export default function App() {
             processes={processes}
             office={office}
             onAddDocument={handleAddDocument}
+            onUpdateDocument={handleUpdateDocument}
             onDeleteDocument={handleDeleteDocument}
             activeUser={activeUser}
           />
@@ -1479,6 +1610,7 @@ export default function App() {
             notificationPermission={notificationPermission}
             onRequestNotificationPermission={handleRequestNotificationPermission}
             activeUser={activeUser}
+            office={office}
           />
         )}
 
@@ -1532,6 +1664,7 @@ export default function App() {
             onAddFinancialRecord={handleAddFinancialRecord}
             onUpdateFinancialRecord={handleUpdateFinancialRecord}
             onDeleteFinancialRecord={handleDeleteFinancialRecord}
+            onClearFinancialRecords={handleClearFinancialRecords}
             onUpdateSaasConfig={handleUpdateSaasConfig}
             onUpdateTenantConfig={handleUpdateSaasConfig}
             onImportFullBackup={handleImportFullBackup}

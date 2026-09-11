@@ -142,6 +142,9 @@ export interface LawOfficeSettings {
     accountNumber: string;
     accountHolder: string;
   };
+  whatsappWebhookUrl?: string;
+  whatsappApiKey?: string;
+  whatsappMessageTemplate?: string;
 }
 
 export type DocumentType =

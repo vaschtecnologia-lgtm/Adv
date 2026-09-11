@@ -125,44 +125,49 @@ html.light header .border-slate-800 {
     background-size: 550px;
   }
 
-  /* Specific Header Styles for .legal-document-paper: Serif typography (Times New Roman / serif), centered and visually distinguished from justified body text */
+  /* Specific Header Styles for .legal-document-paper: Strictly Arial 14pt, Titles in UPPERCASE and BOLD, body text in lowercase/regular */
+  .legal-document-paper,
+  .legal-document-paper * {
+    font-family: Arial, Helvetica, sans-serif !important;
+  }
+
   .legal-document-paper h1,
   .legal-document-paper h2,
   .legal-document-paper .doc-title,
   .legal-document-paper .legal-header-title {
-    font-family: 'Times New Roman', Times, 'Liberation Serif', Georgia, serif !important;
+    font-family: Arial, Helvetica, sans-serif !important;
     text-align: center !important;
-    font-weight: 700 !important;
-    font-size: 16pt !important;
-    margin-top: 1.75rem !important;
-    margin-bottom: 1.75rem !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.06em !important;
-    line-height: 1.4 !important;
+    font-weight: 700 !important; /* NEGRITO */
+    font-size: 14pt !important; /* TAMANHO 14 */
+    margin-top: 1.5rem !important;
+    margin-bottom: 1.5rem !important;
+    text-transform: uppercase !important; /* CAIXA ALTA */
+    letter-spacing: 0.05em !important;
+    line-height: 1.5 !important;
     color: #000000 !important;
   }
 
   .legal-document-paper h2 {
-    border-bottom: 2px solid #1e293b !important;
+    border-bottom: 2px solid #0f172a !important;
     padding-bottom: 0.5rem !important;
   }
 
   .legal-document-paper h3,
   .legal-document-paper h4 {
-    font-family: 'Times New Roman', Times, 'Liberation Serif', Georgia, serif !important;
-    font-weight: 700 !important;
-    font-size: 14pt !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-weight: 700 !important; /* NEGRITO */
+    font-size: 14pt !important; /* TAMANHO 14 */
     color: #000000 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.04em !important;
+    text-transform: uppercase !important; /* CAIXA ALTA */
+    letter-spacing: 0.03em !important;
     margin-top: 1.25rem !important;
     margin-bottom: 0.5rem !important;
   }
 
   .legal-document-paper p {
     font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 14pt !important;
-    font-weight: 400 !important;
+    font-size: 14pt !important; /* TAMANHO 14 */
+    font-weight: 400 !important; /* MINÚSCULO / SEM NEGRITO */
     text-align: justify !important;
     text-justify: inter-word !important;
     color: #000000 !important;
@@ -206,41 +211,48 @@ html.light header .border-slate-800 {
       background-size: 550px !important;
     }
 
+    .legal-document-paper,
+    .legal-document-paper * {
+      font-family: Arial, Helvetica, sans-serif !important;
+    }
+
     .legal-document-paper h1,
     .legal-document-paper h2,
     .legal-document-paper .doc-title,
-    .legal-document-paper .legal-header-title {
-      font-family: 'Times New Roman', Times, 'Liberation Serif', Georgia, serif !important;
+    .legal-header-title {
+      font-family: Arial, Helvetica, sans-serif !important;
       text-align: center !important;
-      font-weight: 700 !important;
-      font-size: 16pt !important;
-      margin-top: 1.75rem !important;
-      margin-bottom: 1.75rem !important;
-      text-transform: uppercase !important;
-      letter-spacing: 0.06em !important;
-      line-height: 1.4 !important;
+      font-weight: 700 !important; /* NEGRITO */
+      font-size: 14pt !important; /* TAMANHO 14 */
+      margin-top: 1.5rem !important;
+      margin-bottom: 1.5rem !important;
+      text-transform: uppercase !important; /* CAIXA ALTA */
+      letter-spacing: 0.05em !important;
+      line-height: 1.5 !important;
       color: #000000 !important;
     }
 
     .legal-document-paper h2 {
-      border-bottom: 2px solid #1e293b !important;
+      border-bottom: 2px solid #0f172a !important;
       padding-bottom: 0.5rem !important;
     }
 
     .legal-document-paper h3,
     .legal-document-paper h4 {
-      font-family: 'Times New Roman', Times, 'Liberation Serif', Georgia, serif !important;
-      font-weight: 700 !important;
-      font-size: 14pt !important;
+      font-family: Arial, Helvetica, sans-serif !important;
+      font-weight: 700 !important; /* NEGRITO */
+      font-size: 14pt !important; /* TAMANHO 14 */
       color: #000000 !important;
-      text-transform: uppercase !important;
-      letter-spacing: 0.04em !important;
+      text-transform: uppercase !important; /* CAIXA ALTA */
+      letter-spacing: 0.03em !important;
+      margin-top: 1.25rem !important;
+      margin-bottom: 0.5rem !important;
     }
 
     .legal-document-paper p {
       font-family: Arial, Helvetica, sans-serif !important;
-      font-size: 14pt !important;
-      font-weight: 400 !important;
+      font-size: 14pt !important; /* TAMANHO 14 */
+      font-weight: 400 !important; /* MINÚSCULO / SEM NEGRITO */
       text-align: justify !important;
       text-justify: inter-word !important;
       color: #000000 !important;

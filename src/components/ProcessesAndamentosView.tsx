@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { LegalProcess, ProcessMovement, Client, ProcessDeadline, LawOfficeSettings, TeamMember, LegalDocumentItem } from '../types';
 import { formatCurrencyBRL, generateSubstabelecimentoText } from '../utils/documentGenerator';
+import { generateProcessListPDF } from '../utils/pdfExportService';
 import { CourtCostsCalculator } from './CourtCostsCalculator';
 import { AdvancedOnlineSearch } from './AdvancedOnlineSearch';
 
@@ -95,6 +96,7 @@ interface ProcessesAndamentosViewProps {
   onUpdateProcess: (process: LegalProcess) => void;
   onDeleteProcess: (id: string) => void;
   onAddMovement: (processId: string, movement: ProcessMovement) => void;
+  onUpdateMovement?: (processId: string, movement: ProcessMovement) => void;
   onDeleteMovement: (processId: string, movementId: string) => void;
   onAddDeadlineToAgenda: (deadline: Omit<ProcessDeadline, 'id'>) => void;
   onOpenDocumentGeneratorForProcess: (process: LegalProcess) => void;
@@ -118,6 +120,7 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
   onUpdateProcess,
   onDeleteProcess,
   onAddMovement,
+  onUpdateMovement,
   onDeleteMovement,
   onAddDeadlineToAgenda,
   onOpenDocumentGeneratorForProcess,
@@ -130,6 +133,54 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
 }) => {
   // Main view mode: 'feed' (all movements & publications), 'process' (by process), 'search' (datajud online search), 'oab_sync' (batch OAB sync), 'calculator' (costs calculator)
   const [viewMode, setViewMode] = useState<'feed' | 'process' | 'search' | 'oab_sync' | 'calculator'>('feed');
+
+  // Edit Movement State
+  const [editingMovement, setEditingMovement] = useState<{
+    processId: string;
+    movement: ProcessMovement;
+  } | null>(null);
+  const [editMovTitle, setEditMovTitle] = useState('');
+  const [editMovCode, setEditMovCode] = useState('');
+  const [editMovDate, setEditMovDate] = useState('');
+  const [editMovOrgan, setEditMovOrgan] = useState('');
+  const [editMovDescription, setEditMovDescription] = useState('');
+  const [editMovIsDecision, setEditMovIsDecision] = useState(false);
+
+  const handleOpenEditMovementModal = (processId: string, mov: ProcessMovement) => {
+    setEditingMovement({ processId, movement: mov });
+    setEditMovTitle(mov.title);
+    setEditMovCode(mov.code || '');
+    setEditMovDate(mov.date ? mov.date.substring(0, 16) : new Date().toISOString().substring(0, 16));
+    setEditMovOrgan(mov.organ || '');
+    setEditMovDescription(mov.description || '');
+    setEditMovIsDecision(!!mov.isJudicialDecision);
+  };
+
+  const handleSaveEditedMovement = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMovement) return;
+    const updated: ProcessMovement = {
+      ...editingMovement.movement,
+      title: editMovTitle,
+      code: editMovCode,
+      date: editMovDate,
+      organ: editMovOrgan,
+      description: editMovDescription,
+      isJudicialDecision: editMovIsDecision,
+    };
+    if (onUpdateMovement) {
+      onUpdateMovement(editingMovement.processId, updated);
+    } else {
+      const proc = processes.find((p) => p.id === editingMovement.processId);
+      if (proc) {
+        onUpdateProcess({
+          ...proc,
+          movements: proc.movements.map((m) => (m.id === updated.id ? updated : m)),
+        });
+      }
+    }
+    setEditingMovement(null);
+  };
 
   const handleDeepLinkSearch = (cnj: string) => {
     localStorage.setItem('wono_search_cnj_query', cnj);
@@ -225,6 +276,33 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
 
   // Status Tags (Etiquetas) & Quick Filter States
   const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+  const handleExportProcessListPDF = async () => {
+    try {
+      setIsExportingPDF(true);
+      const defaultOffice: LawOfficeSettings = office || {
+        officeName: 'Escritório de Advocacia',
+        address: { street: 'Av. Paulista', number: '1000', city: 'São Paulo', state: 'SP', cep: '01310-100' },
+        primaryLawyer: { name: 'Dr. Advogado', oabNumber: '123456', oabState: 'SP', email: 'contato@advocacia.com', phone: '11999999999' }
+      };
+
+      await generateProcessListPDF(
+        filteredProcessesByTag,
+        defaultOffice,
+        {
+          tagFilter: selectedTagFilter,
+          statusFilter: null,
+          searchQuery: ''
+        }
+      );
+    } catch (err) {
+      console.error("Erro ao exportar lista de processos para PDF:", err);
+      alert("Ocorreu um erro ao gerar o PDF da lista de processos.");
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
 
   // Extract all unique status tags across all processes dynamically
   const allUniqueTags = useMemo(() => {
@@ -465,6 +543,10 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
   const [newMovCode, setNewMovCode] = useState('99999');
   const [newMovOrgan, setNewMovOrgan] = useState('');
   const [newMovIsDecision, setNewMovIsDecision] = useState(false);
+  
+  // AI Image Extraction States
+  const [isExtractingImage, setIsExtractingImage] = useState(false);
+  const [extractionFeedback, setExtractionFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   // Substabelecimento States
   const [isSubstabelecimentoModalOpen, setIsSubstabelecimentoModalOpen] = useState(false);
@@ -932,7 +1014,89 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
     setNewMovCode('99999');
     setNewMovOrgan('');
     setNewMovIsDecision(false);
+    setExtractionFeedback(null);
+    setIsExtractingImage(false);
     setIsAddMovementModalOpen(true);
+  };
+
+  const handleImageExtract = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsExtractingImage(true);
+    setExtractionFeedback(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        try {
+          const res = await fetch("/api/extract-process-image", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              image: base64String,
+              mimeType: file.type,
+            }),
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || "Erro desconhecido na extração.");
+          }
+
+          const data = await res.json();
+          
+          if (data.movementType) setNewMovTitle(data.movementType);
+          if (data.description) setNewMovDescription(data.description);
+          if (data.organ) setNewMovOrgan(data.organ);
+          if (data.isJudicialDecision !== undefined) setNewMovIsDecision(data.isJudicialDecision);
+          
+          if (data.cnjNumber) {
+            const cleanExtracted = data.cnjNumber.replace(/\D/g, '');
+            const matchedProc = processes.find(p => {
+              const cleanP = p.cnjNumber.replace(/\D/g, '');
+              return cleanP === cleanExtracted || cleanP.includes(cleanExtracted) || cleanExtracted.includes(cleanP);
+            });
+            if (matchedProc) {
+              setMovementTargetProcessId(matchedProc.id);
+              setExtractionFeedback({
+                type: 'success',
+                message: `Sucesso! Dados extraídos e vinculados ao processo ${matchedProc.cnjNumber} (${matchedProc.activeParty}).`
+              });
+            } else {
+              setExtractionFeedback({
+                type: 'success',
+                message: `Dados extraídos do processo CNJ ${data.cnjNumber}. No entanto, nenhum processo correspondente foi localizado no sistema para vinculação automática. Selecione o processo manualmente no campo abaixo.`
+              });
+            }
+          } else {
+            setExtractionFeedback({
+              type: 'success',
+              message: "Dados extraídos com sucesso! Não foi possível identificar o número do processo na imagem."
+            });
+          }
+        } catch (innerErr: any) {
+          console.error("Error during image extraction request:", innerErr);
+          setExtractionFeedback({
+            type: 'error',
+            message: `Erro ao extrair dados: ${innerErr.message || "Erro de conexão com o servidor."}`
+          });
+        } finally {
+          setIsExtractingImage(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error("FileReader error:", err);
+      setExtractionFeedback({
+        type: 'error',
+        message: `Falha ao ler o arquivo de imagem: ${err.message}`
+      });
+      setIsExtractingImage(false);
+    }
   };
 
   const handleSaveMovement = (e: React.FormEvent) => {
@@ -1524,8 +1688,18 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                             </button>
 
                             <button
+                              onClick={() => handleOpenEditMovementModal(mov.processId, mov)}
+                              disabled={activeUser?.privilege === 'leitura'}
+                              className="text-slate-500 hover:text-amber-400 p-1.5 rounded hover:bg-slate-850 transition cursor-pointer"
+                              title="Editar andamento"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
                               onClick={() => onDeleteMovement(mov.processId, mov.id)}
-                              className="text-slate-600 hover:text-red-400 p-1.5 rounded transition cursor-pointer"
+                              disabled={activeUser?.privilege === 'leitura'}
+                              className="text-slate-600 hover:text-red-400 p-1.5 rounded hover:bg-slate-850 transition cursor-pointer"
                               title="Excluir andamento"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1554,7 +1728,25 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                 <Scale className="w-4 h-4 text-amber-400" />
                 Processos Cadastrados ({processes.length})
               </h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={handleExportProcessListPDF}
+                  disabled={isExportingPDF}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 cursor-pointer border border-slate-700 transition disabled:opacity-50"
+                  title="Exportar Lista Filtrada de Processos em PDF"
+                >
+                  {isExportingPDF ? (
+                    <>
+                      <span className="w-3 h-3 border border-amber-400 border-t-transparent rounded-full animate-spin"></span>
+                      <span>Gerando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-3.5 h-3.5 text-amber-400" />
+                      <span>PDF</span>
+                    </>
+                  )}
+                </button>
                 <button
                   onClick={() => setViewMode('search')}
                   className="text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition shadow-sm"
@@ -1687,6 +1879,50 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                       <span className="text-amber-400 font-semibold flex items-center gap-0.5">
                         {proc.movements.length} andamentos <ChevronRight className="w-3 h-3" />
                       </span>
+                    </div>
+
+                    {/* Direct CRUD Actions on Process Card */}
+                    <div className="flex items-center justify-between pt-1.5 border-t border-slate-800/50 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectProcessId(proc.id);
+                        }}
+                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                        title="Ver autos e andamentos"
+                      >
+                        <Eye className="w-3 h-3 text-amber-400" />
+                        Autos
+                      </button>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEditProcessModal(proc);
+                          }}
+                          disabled={activeUser?.privilege === 'leitura'}
+                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 rounded-lg text-[10px] font-semibold flex items-center gap-1 transition cursor-pointer"
+                          title="Editar processo"
+                        >
+                          <Edit3 className="w-3 h-3 text-amber-400" />
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteProcessConfirm({ isOpen: true, process: proc });
+                          }}
+                          disabled={activeUser?.privilege === 'leitura'}
+                          className="p-1 bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-lg text-[10px] transition cursor-pointer"
+                          title="Excluir processo"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1976,13 +2212,22 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                                   </h4>
                                 </div>
 
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1.5">
                                   <span className="text-[10px] text-slate-500 font-mono">
                                     Código: {mov.code}
                                   </span>
                                   <button
+                                    onClick={() => handleOpenEditMovementModal(currentProcess.id, mov)}
+                                    disabled={activeUser?.privilege === 'leitura'}
+                                    className="text-slate-500 hover:text-amber-400 p-1 rounded hover:bg-slate-850 transition cursor-pointer"
+                                    title="Editar andamento"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
                                     onClick={() => onDeleteMovement(currentProcess.id, mov.id)}
-                                    className="text-slate-600 hover:text-red-400 p-1 rounded transition cursor-pointer"
+                                    disabled={activeUser?.privilege === 'leitura'}
+                                    className="text-slate-600 hover:text-red-400 p-1 rounded hover:bg-slate-850 transition cursor-pointer"
                                     title="Excluir este andamento"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -2664,6 +2909,60 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
               </button>
             </div>
 
+            {/* ✨ Leitura Automática de Imagem (Gemini) */}
+            <div className="bg-slate-950/60 border border-slate-800/80 p-4 rounded-xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                  Preencher com Inteligência Artificial (Gemini)
+                </span>
+                <span className="text-[10px] bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/20 font-semibold">
+                  Multimodal
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Faça o upload de um print ou foto do andamento judicial, despacho ou publicação para extrair os dados e preencher o formulário automaticamente.
+              </p>
+              
+              <div className="flex flex-col gap-2">
+                <label className={`border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-all ${
+                  isExtractingImage 
+                    ? 'border-amber-500/40 bg-amber-500/5' 
+                    : 'border-slate-800 hover:border-amber-500/50 bg-slate-900/40 hover:bg-slate-900/60'
+                }`}>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handleImageExtract} 
+                    disabled={isExtractingImage}
+                  />
+                  {isExtractingImage ? (
+                    <div className="flex flex-col items-center justify-center space-y-1.5 py-1">
+                      <RefreshCw className="w-5 h-5 text-amber-400 animate-spin" />
+                      <span className="text-xs font-semibold text-slate-300">Analisando imagem com Gemini AI...</span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center space-y-1 py-1">
+                      <FileText className="w-5 h-5 text-slate-400" />
+                      <span className="text-xs font-semibold text-slate-300">Clique para selecionar ou arraste a imagem</span>
+                      <span className="text-[10px] text-slate-500">Suporta JPG, PNG, WebP</span>
+                    </div>
+                  )}
+                </label>
+
+                {extractionFeedback && (
+                  <div className={`p-2.5 rounded-lg text-[11px] leading-relaxed border ${
+                    extractionFeedback.type === 'success' 
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+                      : 'bg-red-500/10 border-red-500/30 text-red-400'
+                  }`}>
+                    {extractionFeedback.message}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <form onSubmit={handleSaveMovement} className="space-y-3.5 text-xs">
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
@@ -3070,6 +3369,130 @@ export const ProcessesAndamentosView: React.FC<ProcessesAndamentosViewProps> = (
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Editar Andamento Processual */}
+      {editingMovement && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in duration-150 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-100">Editar Andamento Processual</h3>
+                  <p className="text-xs text-slate-400">Atualize as informações do andamento ou publicação</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingMovement(null)}
+                className="text-slate-500 hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-800 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedMovement} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Título do Andamento / Publicação *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editMovTitle}
+                  onChange={(e) => setEditMovTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Código CNJ / Movimento
+                  </label>
+                  <input
+                    type="text"
+                    value={editMovCode}
+                    onChange={(e) => setEditMovCode(e.target.value)}
+                    placeholder="Ex: 85, 26"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Data e Horário *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={editMovDate}
+                    onChange={(e) => setEditMovDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Órgão Julgador / Vara
+                </label>
+                <input
+                  type="text"
+                  value={editMovOrgan}
+                  onChange={(e) => setEditMovOrgan(e.target.value)}
+                  placeholder="Ex: 2ª Vara Cível de São Paulo"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Teor / Descrição Completa *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={editMovDescription}
+                  onChange={(e) => setEditMovDescription(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <input
+                  type="checkbox"
+                  id="chkIsDecisionModal"
+                  checked={editMovIsDecision}
+                  onChange={(e) => setEditMovIsDecision(e.target.checked)}
+                  className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-amber-500 h-4 w-4 cursor-pointer"
+                />
+                <label htmlFor="chkIsDecisionModal" className="text-xs text-slate-300 font-medium cursor-pointer">
+                  Marcar como Decisão Judicial / Despacho relevante
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingMovement(null)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs rounded-xl transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-500/20"
+                >
+                  <Check className="w-4 h-4" />
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

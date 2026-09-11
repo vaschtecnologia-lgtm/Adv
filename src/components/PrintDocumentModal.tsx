@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { LawOfficeSettings } from '../types';
 import { downloadDocumentAsWordDocx } from '../utils/docxExportService';
+import { formatDocumentToStandardTypography } from '../utils/documentGenerator';
 
 interface PrintDocumentModalProps {
   isOpen: boolean;
@@ -38,7 +39,7 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
   clientName,
   onSaveContent,
 }) => {
-  const [content, setContent] = useState(documentText);
+  const [content, setContent] = useState(() => formatDocumentToStandardTypography(documentText));
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
@@ -133,7 +134,7 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
 
   // Update content if prop changes
   React.useEffect(() => {
-    setContent(documentText);
+    setContent(formatDocumentToStandardTypography(documentText));
   }, [documentText]);
 
   if (!isOpen) return null;
@@ -145,8 +146,9 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
   const handleDownloadWordDocx = async () => {
     try {
       setIsDownloadingWord(true);
+      const formattedContent = formatDocumentToStandardTypography(content);
       const cleanFileName = `${title.replace(/[^a-zA-Z0-9\s_-]/g, '').trim()}_${clientName ? clientName.replace(/\s+/g, '_') : ''}`;
-      await downloadDocumentAsWordDocx(title, content, office, cleanFileName);
+      await downloadDocumentAsWordDocx(title, formattedContent, office, cleanFileName);
       setWordDownloaded(true);
       setTimeout(() => setWordDownloaded(false), 3500);
     } catch (err) {
@@ -157,7 +159,7 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(content);
+    navigator.clipboard.writeText(formatDocumentToStandardTypography(content));
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
@@ -306,25 +308,28 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
               <span>Incluir Timbre do Escritório</span>
             </label>
 
-            <div className="flex items-center gap-1">
-              <span className="text-slate-400">Tamanho da Fonte:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 font-medium">Fonte Arial:</span>
               <button
                 onClick={() => setFontSize('sm')}
-                className={`px-2 py-0.5 rounded ${fontSize === 'sm' ? 'bg-amber-500/20 text-amber-300 font-bold' : 'hover:bg-slate-700'}`}
+                className={`px-2 py-0.5 rounded text-xs transition cursor-pointer ${fontSize === 'sm' ? 'bg-amber-500 text-slate-950 font-bold shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                title="Tamanho 12pt"
               >
-                P
+                12pt
               </button>
               <button
                 onClick={() => setFontSize('base')}
-                className={`px-2 py-0.5 rounded ${fontSize === 'base' ? 'bg-amber-500/20 text-amber-300 font-bold' : 'hover:bg-slate-700'}`}
+                className={`px-2.5 py-0.5 rounded text-xs transition cursor-pointer flex items-center gap-1 ${fontSize === 'base' ? 'bg-amber-500 text-slate-950 font-bold shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                title="Tamanho 14pt (Padrão ABNT / Arial)"
               >
-                M
+                <span>14pt (Padrão)</span>
               </button>
               <button
                 onClick={() => setFontSize('lg')}
-                className={`px-2 py-0.5 rounded ${fontSize === 'lg' ? 'bg-amber-500/20 text-amber-300 font-bold' : 'hover:bg-slate-700'}`}
+                className={`px-2 py-0.5 rounded text-xs transition cursor-pointer ${fontSize === 'lg' ? 'bg-amber-500 text-slate-950 font-bold shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                title="Tamanho 16pt"
               >
-                G
+                16pt
               </button>
             </div>
           </div>
@@ -453,19 +458,19 @@ export const PrintDocumentModal: React.FC<PrintDocumentModalProps> = ({
                     const cleanP = paragraph.trim();
                     if (!cleanP) return null;
 
-                    // Main Title: # TITLE (Bold only in title)
+                    // Main Title: # TITLE (Bold only in title, Arial 14pt, Caixa Alta)
                     if (cleanP.startsWith('# ')) {
                       return (
-                        <h2 key={idx} className="text-center font-bold text-[14pt] uppercase tracking-wider text-slate-950 border-b-2 border-slate-800 pb-2 mb-6">
-                          {cleanP.replace('# ', '').replace(/\*\*/g, '')}
+                        <h2 key={idx} className="text-center font-bold text-[14pt] uppercase tracking-wider text-slate-950 border-b-2 border-slate-800 pb-2 mb-6" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                          {cleanP.replace('# ', '').replace(/\*\*/g, '').toUpperCase()}
                         </h2>
                       );
                     }
-                    // Section Title: ### SECTION (Bold section titles)
+                    // Section Title: ### SECTION (Bold section titles, Arial 14pt, Caixa Alta)
                     if (cleanP.startsWith('### ') || cleanP.startsWith('## ')) {
                       return (
-                        <h3 key={idx} className="font-bold text-[14pt] uppercase text-slate-950 mt-5 mb-2 text-left">
-                          {cleanP.replace(/^###?\s+/, '').replace(/\*\*/g, '')}
+                        <h3 key={idx} className="font-bold text-[14pt] uppercase text-slate-950 mt-5 mb-2 text-left" style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}>
+                          {cleanP.replace(/^###?\s+/, '').replace(/\*\*/g, '').toUpperCase()}
                         </h3>
                       );
                     }

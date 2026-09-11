@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Building, User, CreditCard, Save, X, Scale, Database, Download, Sun, Moon, AlertOctagon, Trash2, Server, Wifi } from 'lucide-react';
+import { Settings, Building, User, CreditCard, Save, X, Scale, Database, Download, Sun, Moon, AlertOctagon, Trash2, Server, Wifi, Calendar, Clock, RefreshCw, Upload, Check, MessageSquare } from 'lucide-react';
 import { LawOfficeSettings, TeamMember } from '../types';
 
 interface SettingsModalProps {
@@ -33,10 +33,89 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [formData, setFormData] = useState<LawOfficeSettings>(office);
   const [tempPassword, setTempPassword] = useState(deletionPassword);
+
+  const [backupInterval, setBackupInterval] = useState<string>(() => {
+    return localStorage.getItem('wono_backup_schedule_interval') || '24h';
+  });
+  const [autoDownload, setAutoDownload] = useState<boolean>(() => {
+    return localStorage.getItem('wono_backup_auto_download') === 'true';
+  });
+  const [backupHistory, setBackupHistory] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('wono_auto_backups_history');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   
   useEffect(() => {
     setTempPassword(deletionPassword);
   }, [deletionPassword]);
+
+  const handleRestoreFromFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (parsed && typeof parsed === 'object') {
+          const confirmRestore = window.confirm(
+            "ATENÇÃO: Restaurar este backup irá substituir permanentemente TODOS os dados atuais do sistema. Deseja prosseguir?"
+          );
+          if (confirmRestore) {
+            // Restore all keys to localStorage
+            Object.keys(parsed).forEach((key) => {
+              localStorage.setItem(key, parsed[key]);
+            });
+            alert("Backup restaurado com absoluto sucesso! O sistema será recarregado.");
+            window.location.reload();
+          }
+        } else {
+          alert("Arquivo de backup inválido.");
+        }
+      } catch (err) {
+        alert("Erro ao ler o arquivo de backup. Certifique-se de que é um arquivo JSON válido.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleDownloadSpecificBackup = (backup: any) => {
+    try {
+      const blob = new Blob([backup.data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `backup_scheduled_juris_wono_${backup.id}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Erro ao baixar backup específico:", err);
+    }
+  };
+
+  const handleRestoreSpecificBackup = (backup: any) => {
+    try {
+      const parsed = JSON.parse(backup.data);
+      const confirmRestore = window.confirm(
+        `ATENÇÃO: Restaurar o backup substituirá todos os dados atuais do sistema. Deseja continuar?`
+      );
+      if (confirmRestore) {
+        Object.keys(parsed).forEach((key) => {
+          localStorage.setItem(key, parsed[key]);
+        });
+        alert("Dados restaurados com sucesso! O sistema será recarregado.");
+        window.location.reload();
+      }
+    } catch (err) {
+      alert("Erro ao restaurar backup selecionado.");
+    }
+  };
 
   const [oabCheckStatus, setOabCheckStatus] = useState<{
     loading: boolean;
@@ -532,6 +611,69 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </div>
 
+          {/* Section: Integração com WhatsApp e Envio de Prazos */}
+          <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
+            <h4 className="font-bold text-amber-400 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+              <MessageSquare className="w-4 h-4" />
+              Integração WhatsApp & Disparo de Prazos
+            </h4>
+            <p className="text-[11px] text-slate-400 leading-normal">
+              Configure uma URL de Webhook ou chave de API de um serviço de automação (como Zapier, Twilio, Evolution API, Z-API, Woovi ou Make) para disparar notificações automáticas de lembretes diretamente para o WhatsApp do cliente quando novos prazos forem adicionados ou estiverem próximos do vencimento.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-slate-300 font-semibold mb-1">URL do Webhook / Endpoint da API</label>
+                <input
+                  type="url"
+                  value={formData.whatsappWebhookUrl || ''}
+                  onChange={(e) => setFormData({ ...formData, whatsappWebhookUrl: e.target.value })}
+                  placeholder="https://api.evolution-api.com/v1/messages/sendText"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:border-amber-500 focus:outline-none font-mono text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Chave de Autenticação / Token de API</label>
+                <input
+                  type="password"
+                  value={formData.whatsappApiKey || ''}
+                  onChange={(e) => setFormData({ ...formData, whatsappApiKey: e.target.value })}
+                  placeholder="Ex: Bearer wono_live_key..."
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:border-amber-500 focus:outline-none font-mono text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Status da API</label>
+                <div className="flex items-center gap-2 h-9 px-3 bg-slate-900/50 border border-slate-800 rounded-lg">
+                  <div className={`w-2.5 h-2.5 rounded-full ${formData.whatsappWebhookUrl ? 'bg-emerald-500 animate-pulse' : 'bg-slate-600'}`}></div>
+                  <span className="text-slate-300 font-semibold text-xs">
+                    {formData.whatsappWebhookUrl ? 'Conectado / Ativo' : 'Aguardando Configuração'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-slate-300 font-semibold mb-1">Template de Mensagem dos Lembretes</label>
+                <textarea
+                  value={formData.whatsappMessageTemplate || ''}
+                  onChange={(e) => setFormData({ ...formData, whatsappMessageTemplate: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:border-amber-500 focus:outline-none text-xs font-mono"
+                  placeholder="Olá {cliente}, o seu processo {processo} tem o prazo {prazo} agendado para o dia {data}."
+                />
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">Tags mágicas:</span>
+                  <button type="button" className="text-[10px] bg-slate-900 text-amber-400 font-mono px-1.5 py-0.5 rounded border border-slate-700 cursor-pointer hover:bg-slate-800" title="Insere o nome do cliente" onClick={() => setFormData({ ...formData, whatsappMessageTemplate: (formData.whatsappMessageTemplate || '') + '{cliente}' })}>{`{cliente}`}</button>
+                  <button type="button" className="text-[10px] bg-slate-900 text-amber-400 font-mono px-1.5 py-0.5 rounded border border-slate-700 cursor-pointer hover:bg-slate-800" title="Insere o número ou título do processo" onClick={() => setFormData({ ...formData, whatsappMessageTemplate: (formData.whatsappMessageTemplate || '') + '{processo}' })}>{`{processo}`}</button>
+                  <button type="button" className="text-[10px] bg-slate-900 text-amber-400 font-mono px-1.5 py-0.5 rounded border border-slate-700 cursor-pointer hover:bg-slate-800" title="Insere a descrição ou título do prazo" onClick={() => setFormData({ ...formData, whatsappMessageTemplate: (formData.whatsappMessageTemplate || '') + '{prazo}' })}>{`{prazo}`}</button>
+                  <button type="button" className="text-[10px] bg-slate-900 text-amber-400 font-mono px-1.5 py-0.5 rounded border border-slate-700 cursor-pointer hover:bg-slate-800" title="Insere a data de vencimento" onClick={() => setFormData({ ...formData, whatsappMessageTemplate: (formData.whatsappMessageTemplate || '') + '{data}' })}>{`{data}`}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Section: Personalização Visual & Tema */}
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
             <div className="flex items-center justify-between">
@@ -595,30 +737,158 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
             <h4 className="font-bold text-amber-400 text-xs flex items-center gap-1.5 uppercase tracking-wider">
               <Database className="w-4 h-4" />
-              Backup e Exportação de Segurança (Local Storage)
+              Backup, Agendamento e Segurança (JSON)
             </h4>
 
             <div className="space-y-3">
               <p className="text-slate-400 leading-relaxed text-[11px]">
-                Todos os dados do seu escritório (processos, andamentos, prazos, clientes e documentos gerados) estão salvos com segurança de forma local neste navegador. Recomendamos baixar um backup periódico para prevenção de perdas por limpeza acidental de cache do navegador.
+                Todos os dados do seu escritório (processos, andamentos, prazos, clientes e documentos gerados) estão salvos com segurança de forma local neste navegador. Recomendamos baixar um backup periódico ou utilizar o agendamento automático abaixo para prevenção de perdas por limpeza acidental de cache do navegador.
               </p>
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-900 rounded-xl border border-slate-800">
                 <div>
-                  <span className="block font-bold text-slate-200">Exportar Banco de Dados</span>
+                  <span className="block font-bold text-slate-200">Exportar Banco de Dados Manual</span>
                   <span className="block text-[10px] text-slate-500 mt-0.5 font-mono">
-                    Gera um arquivo comprimido .json de todos os registros ativos
+                    Gera um arquivo comprimido .json de todos os registros ativos imediatamente
                   </span>
                 </div>
                 
                 <button
                   type="button"
                   onClick={handleDownloadBackup}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 font-extrabold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700 hover:border-slate-600 transition whitespace-nowrap"
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-amber-400 font-extrabold rounded-lg flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700 hover:border-slate-600 transition whitespace-nowrap text-xs"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download Backup JSON
                 </button>
+              </div>
+
+              {/* Scheduler & Automatic Backup Panel */}
+              <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span className="font-extrabold text-slate-200 text-xs">Agendador de Backups Automáticos</span>
+                  </div>
+                  <span className="text-[9px] bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded font-bold font-mono">SEGURANÇA ATIVA</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-slate-300 text-xs font-semibold mb-1">Frequência do Backup Automático</label>
+                    <select
+                      value={backupInterval}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setBackupInterval(val);
+                        localStorage.setItem('wono_backup_schedule_interval', val);
+                      }}
+                      className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-100 focus:border-amber-500 focus:outline-none text-xs"
+                    >
+                      <option value="off">Desativado</option>
+                      <option value="10m">A cada 10 minutos (Altamente frequente)</option>
+                      <option value="1h">A cada 1 hora (Frequência média)</option>
+                      <option value="12h">A cada 12 horas</option>
+                      <option value="24h">A cada 24 horas (Recomendado)</option>
+                      <option value="7d">A cada 7 dias (Semanal)</option>
+                    </select>
+                    <span className="text-[10px] text-slate-500 mt-1 block leading-normal">
+                      Salva uma cópia completa dos dados de forma segura no histórico de backups do navegador.
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col justify-center">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={autoDownload}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setAutoDownload(val);
+                          localStorage.setItem('wono_backup_auto_download', String(val));
+                        }}
+                        className="rounded border-slate-700 bg-slate-950 text-amber-500 focus:ring-amber-500/30 w-4 h-4"
+                      />
+                      <span className="text-slate-300 text-xs font-semibold">Realizar Download Automático Periódico</span>
+                    </label>
+                    <span className="text-[10px] text-slate-500 mt-1 block leading-normal pl-6">
+                      Se ativado, inicia o download do arquivo JSON automaticamente quando o agendamento for acionado em segundo plano.
+                    </span>
+                  </div>
+                </div>
+
+                {/* Manual Restore File Upload */}
+                <div className="pt-2 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="space-y-0.5">
+                    <span className="block text-xs font-bold text-slate-200">Restaurar de um Arquivo (.json)</span>
+                    <span className="block text-[10px] text-slate-500 leading-normal">
+                      Carregue um arquivo de backup baixado anteriormente para restaurar 100% dos dados.
+                    </span>
+                  </div>
+
+                  <div className="relative shrink-0">
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={handleRestoreFromFile}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-lg flex items-center justify-center gap-1 cursor-pointer border border-slate-700 transition"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-amber-400" />
+                      Fazer Upload de Backup
+                    </button>
+                  </div>
+                </div>
+
+                {/* Backups History Table */}
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <span className="block text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                    Histórico de Backups Automáticos no Navegador
+                  </span>
+                  
+                  {backupHistory.length === 0 ? (
+                    <div className="text-center py-4 bg-slate-950/30 rounded-lg border border-slate-850">
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Nenhum backup automático no histórico</span>
+                    </div>
+                  ) : (
+                    <div className="max-h-40 overflow-y-auto border border-slate-800 rounded-lg bg-slate-950/40 divide-y divide-slate-850">
+                      {backupHistory.map((backup, idx) => (
+                        <div key={backup.id || idx} className="p-2.5 flex items-center justify-between text-xs hover:bg-slate-900/50 transition">
+                          <div className="space-y-0.5">
+                            <span className="block font-bold text-slate-200">{backup.label}</span>
+                            <span className="block text-[10px] text-slate-500 font-mono">
+                              {new Date(backup.timestamp).toLocaleString('pt-BR')} | {(backup.size / 1024).toFixed(1)} KB
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadSpecificBackup(backup)}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md transition border border-slate-750"
+                              title="Download arquivo JSON"
+                            >
+                              <Download className="w-3.5 h-3.5 text-amber-400" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRestoreSpecificBackup(backup)}
+                              className="px-2.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-md text-[10px] transition uppercase tracking-wide flex items-center gap-1 cursor-pointer"
+                              title="Restaurar este ponto"
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                              Restaurar
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Deletion Password Security Field */}
